@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
@@ -5,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.example.matjang_compose"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.matjang_compose"
@@ -18,6 +21,14 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        val localProperties = Properties()
+        localProperties.load(project.rootProject.file("local.properties").inputStream())
+        val nativeAppKey = localProperties.getProperty("KAKAO_NATIVE_APP_KEY")?:""
+
+        buildConfigField("String", "KAKAO_NATIVE_APP_KEY", nativeAppKey)
+        //manifest에서 사용
+        manifestPlaceholders["KAKAO_NATIVE_APP_KEY"] = nativeAppKey
     }
 
     buildTypes {
@@ -38,6 +49,9 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+        viewBinding = true
+        dataBinding = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.1"
@@ -66,4 +80,11 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+    implementation("com.kakao.sdk:v2-all:2.21.0")
+
+    implementation ("androidx.compose.ui:ui:1.5.0")
+    implementation ("androidx.compose.material3:material3:1.1.0")
+    implementation ("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1")
+    implementation ("androidx.activity:activity-compose:1.7.2")
 }
