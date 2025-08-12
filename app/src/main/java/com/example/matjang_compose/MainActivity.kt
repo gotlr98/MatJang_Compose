@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.matjang_compose.ui.theme.MatJang_ComposeTheme
 
@@ -47,8 +48,11 @@ fun MainAppContent(modifier: Modifier = Modifier) {
             }
         )
     } else {
-        // 로그인 성공 후 보여줄 화면 (예: 홈 화면)
-        Text(text = "안녕하세요, $loggedInUserName 님!", modifier = modifier)
-        // 여기에 홈 화면 UI나 네비게이션 추가 가능
+        // 예: 서울시청 좌표
+        MainMapView(
+            modifier = modifier,
+            latitude = 37.5665,
+            longitude = 126.9780
+        )
     }
 }

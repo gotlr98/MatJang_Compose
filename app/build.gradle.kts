@@ -4,6 +4,8 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
+    id("com.google.gms.google-services")
+    id("org.jetbrains.kotlin.plugin.compose") version "2.1.0"
 }
 
 android {
@@ -26,7 +28,7 @@ android {
         localProperties.load(project.rootProject.file("local.properties").inputStream())
         val nativeAppKey = localProperties.getProperty("KAKAO_NATIVE_APP_KEY")?:""
 
-        buildConfigField("String", "KAKAO_NATIVE_APP_KEY", nativeAppKey)
+        buildConfigField("String", "KAKAO_NATIVE_APP_KEY", "\"$nativeAppKey\"")
         //manifest에서 사용
         manifestPlaceholders["KAKAO_NATIVE_APP_KEY"] = nativeAppKey
     }
@@ -87,4 +89,11 @@ dependencies {
     implementation ("androidx.compose.material3:material3:1.1.0")
     implementation ("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1")
     implementation ("androidx.activity:activity-compose:1.7.2")
+
+    implementation(platform("com.google.firebase:firebase-bom:34.1.0"))
+    implementation("com.google.firebase:firebase-analytics")
+
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.0")
+
+    implementation("com.kakao.maps.open:android:2.12.8")
 }
