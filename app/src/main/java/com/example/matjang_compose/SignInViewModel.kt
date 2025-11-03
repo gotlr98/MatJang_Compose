@@ -68,17 +68,24 @@ class SignInViewModel : ViewModel() {
         } else if (token != null) {
             Log.d("SignInViewModel", "로그인 성공, 토큰 있음")
             UserApiClient.instance.me { user, error ->
+                if (error != null) {
+                    Log.d("SignInViewModel", "사용자 정보 불러오기 실패: ${error.message}")
+                    _uiState.value = LoginUiState.Error("사용자 정보를 불러오지 못했습니다.")
+                    return@me
+                }
+
                 if (user != null) {
-                    val email = "${user.kakaoAccount?.email}&kakao" ?: "Unknown"
+                    val email = user.kakaoAccount?.email ?: "Unknown"
                     Log.d("SignInViewModel", "사용자 정보 성공, email: $email")
                     _uiState.value = LoginUiState.Success(email)
                 } else {
-                    Log.d("SignInViewModel", "사용자 정보를 불러오지 못했습니다.")
+                    Log.d("SignInViewModel", "사용자 정보가 null입니다.")
                     _uiState.value = LoginUiState.Error("사용자 정보를 불러오지 못했습니다.")
                 }
             }
         }
     }
+
 
     fun logout() {
         UserApiClient.instance.logout {
