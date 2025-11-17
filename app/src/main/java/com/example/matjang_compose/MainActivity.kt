@@ -23,8 +23,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MatJang_ComposeTheme {
-                Scaffold { innerPadding ->
-                    val navController = rememberNavController()
+                val navController = rememberNavController()
+
+                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     AppNavGraph(
                         navController = navController,
                         modifier = Modifier.padding(innerPadding)
@@ -34,41 +35,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
-//@Composable
-//fun MainAppContent(
-//    modifier: Modifier = Modifier,
-//    viewModel: SignInViewModel = viewModel(),
-//    navController: androidx.navigation.NavHostController
-//) {
-//    val uiState by viewModel.uiState.collectAsState()
-//
-//    NavHost(
-//        navController = navController,
-//        startDestination = "signin"
-//    ) {
-//        // 로그인 화면
-//        composable(NavRoutes.Map.route) {
-//            SignInView(
-//                viewModel = viewModel,
-//                onLoginSuccess = { email ->
-//                    Log.d("Nav", "로그인 성공 → 지도 이동 ($email)")
-//                    navController.navigate(NavRoutes.Map.route) {
-//                        popUpTo("login") { inclusive = true } // 뒤로가기 시 로그인 안보이게
-//                    }
-//                },
-//                onLogout = {
-//
-//                },
-//            )
-//        }
-//
-//        composable(NavRoutes.Map.route) {
-//            MainMapView(
-//                modifier = modifier,
-//                latitude = 37.5665,
-//                longitude = 126.9780
-//            )
-//        }
-//    }
-//}

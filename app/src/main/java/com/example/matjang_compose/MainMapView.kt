@@ -21,7 +21,7 @@ import java.lang.Exception
 
 @Composable
 fun MainMapView(
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
     latitude: Double,
     longitude: Double,
 ){

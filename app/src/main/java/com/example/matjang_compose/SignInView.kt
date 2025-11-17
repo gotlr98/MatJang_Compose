@@ -2,76 +2,60 @@ package com.example.matjang_compose
 
 import android.util.Log
 import androidx.compose.runtime.*
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-
+import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun SignInView(
     viewModel: SignInViewModel = viewModel(),
-    onLoginSuccess: (String) -> Unit,
-    onLogout: () -> Unit
-
+    onLoginSuccess: (String) -> Unit
 ) {
-    val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsState()
+
+    // 로그인 성공 시 네비게이션을 실행하는 곳
+    LaunchedEffect(uiState) {
+        if (uiState is LoginUiState.Success) {
+            val email = (uiState as LoginUiState.Success).userEmail
+            Log.d("SignInView", "로그인 성공 감지 → onLoginSuccess 호출")
+            onLoginSuccess(email)
+        }
+    }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
+
         when (uiState) {
-            is LoginUiState.Loading -> {
+            LoginUiState.Loading -> {
                 CircularProgressIndicator()
             }
 
-            is LoginUiState.Success -> {
-                val email = (uiState as LoginUiState.Success).userEmail
-                Log.d("login", "login success: $email")
-                onLoginSuccess(email)
-
-            }
-
             is LoginUiState.Error -> {
-                val message = (uiState as LoginUiState.Error).message
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.error
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = {
-                        Log.d("SignInView", "로그인 재시도 클릭")
-                        viewModel.loginWithKakao(context)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("다시 로그인 시도")
+                Text(text = (uiState as LoginUiState.Error).message)
+                Spacer(Modifier.height(16.dp))
+                Button(onClick = { viewModel.loginWithKakao(context) }) {
+                    Text("다시 로그인")
                 }
             }
 
-            is LoginUiState.LoggedOut -> {
-                Button(
-                    onClick = {
-                        Log.d("SignInView", "카카오 로그인 클릭")
-                        viewModel.loginWithKakao(context)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+            LoginUiState.LoggedOut -> {
+                Button(onClick = { viewModel.loginWithKakao(context) }) {
                     Text("카카오로 로그인")
                 }
+            }
+
+            is LoginUiState.Success -> {
+                // 화면 이동은 LaunchedEffect에서 처리됨
+                Text("로그인 완료! 잠시만 기다려주세요…")
             }
         }
     }
