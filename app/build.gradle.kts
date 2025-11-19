@@ -97,11 +97,4 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.0")
 
     implementation("com.kakao.maps.open:android:2.12.8")
-
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    // JSON to Kotlin 객체 변환을 위한 컨버터 (Gson 사용)
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
 }
