@@ -23,36 +23,27 @@ import java.lang.Exception
 fun MainMapView(
     modifier: Modifier = Modifier,
     latitude: Double,
-    longitude: Double,
-){
+    longitude: Double
+) {
     val context = LocalContext.current
     val mapView = remember { MapView(context) }
 
     AndroidView(
         modifier = modifier.fillMaxSize(),
-        factory = { context ->
+        factory = {
             mapView.apply {
-                mapView.start(
-                    object: MapLifeCycleCallback(){
-                        override fun onMapDestroy() {
-                        }
-
-                        override fun onMapError(p0: Exception?) {
-                        }
+                start(
+                    object : MapLifeCycleCallback() {
+                        override fun onMapDestroy() {}
+                        override fun onMapError(p0: Exception?) {}
                     },
-                    object: KakaoMapReadyCallback(){
-                        override fun onMapReady(p0: KakaoMap) {
-                            p0.moveCamera(
+                    object : KakaoMapReadyCallback() {
+                        override fun onMapReady(map: KakaoMap) {
+                            map.moveCamera(
                                 CameraUpdateFactory.newCenterPosition(
-                                LatLng.from(
-                                    latitude, longitude
+                                    LatLng.from(latitude, longitude)
                                 )
-                            ))
-
-                        }
-
-                        override fun getPosition(): LatLng {
-                            return super.getPosition()
+                            )
                         }
                     }
                 )

@@ -1,5 +1,6 @@
 package com.example.matjang_compose
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -16,22 +17,21 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.matjang_compose.ui.theme.MatJang_ComposeTheme
+import com.kakao.sdk.auth.AuthCodeHandlerActivity
+import com.kakao.sdk.common.KakaoSdk
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            MatJang_ComposeTheme {
-                val navController = rememberNavController()
 
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    AppNavGraph(
-                        navController = navController,
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
-            }
+        setContent {
+            val navController = rememberNavController()
+            AppNavGraph(navController)
         }
     }
 }
+
+
+
+
+

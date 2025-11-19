@@ -19,6 +19,7 @@
       <change beforePath="$PROJECT_DIR$/.gradle/file-system.probe" beforeDir="false" afterPath="$PROJECT_DIR$/.gradle/file-system.probe" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/AndroidManifest.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/matjang_compose/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/matjang_compose/MainActivity.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/matjang_compose/MainMapView.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/matjang_compose/MainMapView.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/matjang_compose/NavGraph.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/matjang_compose/NavGraph.kt" afterDir="false" />
@@ -200,12 +201,12 @@
       <map>
         <entry key="com.example.matjang_compose">
           <value>
-            <CheckInfo lastCheckTimestamp="1755147164975" />
+            <CheckInfo lastCheckTimestamp="1763445122596" />
           </value>
         </entry>
         <entry key="com.example.matjang_compose.test">
           <value>
-            <CheckInfo lastCheckTimestamp="1755147164826" />
+            <CheckInfo lastCheckTimestamp="1763445122597" />
           </value>
         </entry>
       </map>
