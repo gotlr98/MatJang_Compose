@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 // PlaceBottomSheet.kt (Bottom Sheet UI)
 
 @Composable
-fun PlaceBottomSheet(matjip: Matjip, onDismiss: () -> Unit) {
+fun MatjipBottomSheet(matjip: Matjip, onDismiss: () -> Unit) {
     // Material 3의 BottomSheetScaffold 또는 ModalBottomSheet 사용
     // 여기서는 간단한 UI 예시만 제공합니다.
     Surface(
@@ -30,7 +30,7 @@ fun PlaceBottomSheet(matjip: Matjip, onDismiss: () -> Unit) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = matjip.place_name, style = MaterialTheme.typography.titleLarge)
             Spacer(modifier = Modifier.height(8.dp))
-            Text(text = "주소: ${matjip.road_address_name}", style = MaterialTheme.typography.bodyMedium)
+            Text(text = "주소: ${matjip.address_name}", style = MaterialTheme.typography.bodyMedium)
             Text(text = "전화번호: ${matjip.phone}", style = MaterialTheme.typography.bodyMedium)
 
             // 닫기 버튼

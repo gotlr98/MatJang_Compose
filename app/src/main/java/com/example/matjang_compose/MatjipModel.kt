@@ -3,10 +3,6 @@ package com.example.matjang_compose
 import com.google.gson.annotations.SerializedName
 import java.io.Serializable
 
-// data/Matjip.kt (최종 권장안)
-import java.io.Serializable
-import com.google.gson.annotations.SerializedName
-
 data class MatjipResponse(
     val documents: List<Matjip>
 )
