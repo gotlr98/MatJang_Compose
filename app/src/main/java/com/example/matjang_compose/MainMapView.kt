@@ -2,6 +2,7 @@
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
@@ -48,6 +49,8 @@ fun MainMapView(
     val selectedMatjip by viewModel.selectedMatjip.collectAsState()
 
     var kakaoMapController by remember { mutableStateOf<KakaoMap?>(null) }
+
+    var searchText by remember { mutableStateOf("") }
 
     // 2. 전체 구조: ModalNavigationDrawer로 감싸기
     ModalNavigationDrawer(
@@ -120,6 +123,46 @@ fun MainMapView(
 //                    }
 //                }
             )
+
+            Row(
+                modifier = Modifier.
+                fillMaxWidth()
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ){
+                IconButton(
+                    onClick = {scope.launch{ drawerState.open()}},
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(Color.White, CircleShape)
+                        .shadow(elevation = 4.dp, shape = CircleShape)
+                ){
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "메뉴 열기",
+                        tint = Color.Black
+
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                OutlinedTextField(
+                    value = searchText,
+                    onValueChange = { searchText = it },
+                    label = { Text("맛집 검색") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(), // 남은 공간 채우기
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        // 나머지 색상 설정 (선택적)
+                    )
+                )
+            }
 
             LaunchedEffect(kakaoMapController, matjipPlaces) {
                 val map = kakaoMapController ?: return@LaunchedEffect
