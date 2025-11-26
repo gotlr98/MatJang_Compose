@@ -24,4 +24,14 @@ interface KakaoLocalService {
         // 정렬 기준 (거리순)
         @Query("sort") sort: String = "distance"
     ): MatjipResponse
+
+    @GET("v2/local/search/keyword.json")
+    suspend fun searchKeyword(
+        @Header("Authorization") apiKey: String,
+        @Query("query") query: String,             // 검색어
+        @Query("x") x: Double,                     // 중심 경도
+        @Query("y") y: Double,                     // 중심 위도
+        @Query("radius") radius: Int = 5000,       // 반경 5km
+        @Query("category_group_code") categoryGroupCode: String = "FD6" // 음식점으로 제한
+    ): MatjipResponse
 }

@@ -50,6 +50,29 @@ class MapViewModel(
         }
     }
 
+    fun searchByKeyword(keyword: String, centerLat: Double, centerLng: Double) {
+        if (keyword.isBlank()) return // 빈 검색어면 실행 안 함
+
+        viewModelScope.launch {
+            try {
+                val response = apiService.searchKeyword(
+                    apiKey = "KakaoAK $REST_API_KEY",
+                    query = keyword,
+                    x = centerLng,
+                    y = centerLat
+                )
+
+                // 검색 결과가 있으면 핀 업데이트
+                // (자동으로 MainMapView의 LaunchedEffect가 감지해서 핀을 다시 그림)
+                _matjips.value = response.documents
+                Log.d("MapViewModel", "키워드 검색 성공: ${keyword}, 결과 ${response.documents.size}개")
+
+            } catch (e: Exception) {
+                Log.e("MapViewModel", "키워드 검색 실패: ${e.message}")
+            }
+        }
+    }
+
     // 핀 클릭 시 호출되어 바텀 시트를 띄울 장소를 설정
     fun selectMatjip(matjip: Matjip) {
         _selectedMatjip.value = matjip

@@ -3,8 +3,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +36,8 @@ import kotlinx.coroutines.launch
 import com.kakao.vectormap.label.LabelTextBuilder
 import com.kakao.vectormap.label.LabelTextStyle
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 
 @Composable
 fun MainMapView(
@@ -51,6 +56,24 @@ fun MainMapView(
     var kakaoMapController by remember { mutableStateOf<KakaoMap?>(null) }
 
     var searchText by remember { mutableStateOf("") }
+
+    val focusManager = LocalFocusManager.current
+
+    fun doSearch() {
+        val map = kakaoMapController ?: return
+        // 현재 지도의 카메라 중심 좌표 가져오기
+        val cameraPos = map.cameraPosition?.position
+
+        if (cameraPos != null) {
+            viewModel.searchByKeyword(
+                keyword = searchText,
+                centerLat = cameraPos.latitude,
+                centerLng = cameraPos.longitude
+            )
+            // 키보드 내리기
+            focusManager.clearFocus()
+        }
+    }
 
     // 2. 전체 구조: ModalNavigationDrawer로 감싸기
     ModalNavigationDrawer(
@@ -152,15 +175,23 @@ fun MainMapView(
                 OutlinedTextField(
                     value = searchText,
                     onValueChange = { searchText = it },
-                    label = { Text("맛집 검색") },
+                    placeholder = {Text("검색어를 입력하세요")},
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(), // 남은 공간 채우기
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
-                        // 나머지 색상 설정 (선택적)
-                    )
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    // 2. 키보드 동작: '검색' 버튼 누르면 실행
+                    keyboardActions = KeyboardActions(onSearch = { doSearch() }),
+                    // 3. 우측 돋보기 아이콘 추가 (클릭 시 실행)
+                    trailingIcon = {
+                        IconButton(onClick = { doSearch() }) {
+                            Icon(imageVector = Icons.Default.Search, contentDescription = "검색")
+                        }
+                    }
                 )
             }
 
