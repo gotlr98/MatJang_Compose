@@ -1,5 +1,6 @@
 package com.example.matjang_compose
 
+import MainMapView
 import android.util.Log
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -14,8 +15,14 @@ import androidx.navigation.navArgument
 fun AppNavGraph(navController: NavHostController) {
     NavHost(
         navController = navController,
-        startDestination = NavRoutes.Login.route // .name 대신 .route 권장
+        startDestination = NavRoutes.Splash.route // .name 대신 .route 권장
     ) {
+
+        // 스플래시 화면 (자동로그인 체크)
+        composable(NavRoutes.Splash.route) {
+            SplashView(navController = navController)
+        }
+
         // 로그인 화면
         composable(NavRoutes.Login.route) {
             SignInView(navController = navController)
