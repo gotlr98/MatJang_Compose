@@ -11,8 +11,11 @@
   <component name="ChangeListManager">
     <list default="true" id="8846b857-b98d-49fa-892b-c25f1cb9ddfd" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/matjang_compose/NavGraph.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/matjang_compose/NavGraph.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/matjang_compose/NavRoute.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/matjang_compose/NavRoute.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/app/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/matjang_compose/SignInViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/matjang_compose/SignInViewModel.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/matjang_compose/UserModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/matjang_compose/UserModel.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle/libs.versions.toml" beforeDir="false" afterPath="$PROJECT_DIR$/gradle/libs.versions.toml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -31,8 +34,8 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
-        <option value="Kotlin Class" />
         <option value="valueResourceFile" />
+        <option value="Kotlin Class" />
       </list>
     </option>
   </component>
@@ -84,8 +87,8 @@
 }</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
-      <recent name="$PROJECT_DIR$/app" />
       <recent name="$PROJECT_DIR$/app/src/main/java/com/example/matjang_compose" />
+      <recent name="$PROJECT_DIR$/app" />
     </key>
   </component>
   <component name="RunManager">
@@ -189,12 +192,12 @@
       <map>
         <entry key="com.example.matjang_compose">
           <value>
-            <CheckInfo lastCheckTimestamp="1763954644583" />
+            <CheckInfo lastCheckTimestamp="1764564844715" />
           </value>
         </entry>
         <entry key="com.example.matjang_compose.test">
           <value>
-            <CheckInfo lastCheckTimestamp="1763954644583" />
+            <CheckInfo lastCheckTimestamp="1764564844716" />
           </value>
         </entry>
       </map>

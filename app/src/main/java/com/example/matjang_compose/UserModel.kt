@@ -6,6 +6,7 @@ enum class Type {
 
 data class UserModel(
 
+    val id: Long,
     val email: String = "",
     val type: Type = Type.Guest,
     val reviews: List<ReviewModel> = emptyList(),
