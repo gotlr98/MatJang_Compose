@@ -8,14 +8,18 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.getkeepsafe.relinker.BuildConfig
+import com.google.firebase.Firebase
+import com.google.firebase.firestore.firestore
+import com.kakao.sdk.user.UserApiClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.UUID
 
-class MapViewModel(
+class MainMapViewModel(
     private val apiService: KakaoLocalService // 의존성 주입
 ) : ViewModel() {
 
@@ -29,7 +33,74 @@ class MapViewModel(
     private val _selectedPlace = MutableStateFlow<Matjip?>(null)
     val selectedPlace: StateFlow<Matjip?> = _selectedPlace.asStateFlow()
 
-    private val REST_API_KEY = com.example.matjang_compose.BuildConfig.KAKAO_REST_API_KEY // local.properties의 REST API 키 사용
+    private val REST_API_KEY = com.example.matjang_compose.BuildConfig.KAKAO_REST_API_KEY
+
+    private val _bookmarkFolders = MutableStateFlow<List<BookmarkFolder>>(emptyList())
+    val bookmarkFolders: StateFlow<List<BookmarkFolder>> = _bookmarkFolders.asStateFlow()
+
+    private val db = Firebase.firestore
+
+    fun fetchBookmarkFolders() {
+        UserApiClient.instance.me { user, error ->
+            if (user != null) {
+                val userId = user.id.toString()
+                db.collection("users").document(userId)
+                    .collection("bookmark_folders")
+                    .orderBy("timestamp") // 생성순 정렬
+                    .get()
+                    .addOnSuccessListener { result ->
+                        val folders = result.documents.map { doc ->
+                            BookmarkFolder(
+                                id = doc.id,
+                                name = doc.getString("name") ?: "",
+                                timestamp = doc.getLong("timestamp") ?: 0L
+                            )
+                        }
+                        _bookmarkFolders.value = folders
+                    }
+            }
+        }
+    }
+
+    fun createBookmarkFolder(folderName: String) {
+        UserApiClient.instance.me { user, error ->
+            if (user != null) {
+                val userId = user.id.toString()
+                val folderId = UUID.randomUUID().toString() // 랜덤 ID 생성
+                val newFolder = BookmarkFolder(
+                    id = folderId,
+                    name = folderName
+                )
+
+                db.collection("users").document(userId)
+                    .collection("bookmark_folders").document(folderId)
+                    .set(newFolder)
+                    .addOnSuccessListener {
+                        // 생성 후 목록 다시 갱신
+                        fetchBookmarkFolders()
+                        // (선택사항) 토스트 메시지 등 처리
+                    }
+            }
+        }
+    }
+
+    fun addMatjipToFolder(folder: BookmarkFolder, matjip: Matjip) {
+        UserApiClient.instance.me { user, error ->
+            if (user != null) {
+                val userId = user.id.toString()
+
+                // 해당 폴더 하위의 'places' 컬렉션에 맛집 저장
+                db.collection("users").document(userId)
+                    .collection("bookmark_folders").document(folder.id)
+                    .collection("places").document(matjip.id) // matjip.id를 문서 ID로 사용
+                    .set(matjip)
+                    .addOnSuccessListener {
+                        Log.d("Firestore", "${folder.name}에 ${matjip.place_name} 저장 완료")
+                        // 여기서 UI에 "저장되었습니다" 스낵바 이벤트를 보내면 좋습니다.
+                    }
+            }
+        }
+    }
 
     fun searchPlaces(centerLat: Double, centerLng: Double) {
         viewModelScope.launch {
@@ -95,7 +166,7 @@ class MapViewModel(
                 val apiService = retrofit.create(KakaoLocalService::class.java)
 
                 // ViewModel 생성 및 반환
-                MapViewModel(apiService)
+                MainMapViewModel(apiService)
             }
         }
     }

@@ -18,9 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.matjang_compose.MapViewModel
 import com.example.matjang_compose.Matjip
-import com.example.matjang_compose.MatjipBottomSheet
 import com.example.matjang_compose.R
 import com.kakao.vectormap.KakaoMap
 import com.kakao.vectormap.KakaoMapReadyCallback
@@ -38,12 +36,13 @@ import com.kakao.vectormap.label.LabelTextStyle
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
+import com.example.matjang_compose.MainMapViewModel
 
 @Composable
 fun MainMapView(
     latitude: Double,
     longitude: Double,
-    viewModel: MapViewModel = viewModel(factory = MapViewModel.Factory)
+    viewModel: MainMapViewModel = viewModel(factory = MainMapViewModel.Factory)
 ) {
     // 1. 서랍(Drawer) 상태 관리
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
