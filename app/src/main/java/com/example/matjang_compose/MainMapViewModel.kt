@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.getkeepsafe.relinker.BuildConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,7 +29,7 @@ class MapViewModel(
     private val _selectedPlace = MutableStateFlow<Matjip?>(null)
     val selectedPlace: StateFlow<Matjip?> = _selectedPlace.asStateFlow()
 
-    private val REST_API_KEY = BuildConfig.KAKAO_REST_API_KEY // local.properties의 REST API 키 사용
+    private val REST_API_KEY = com.example.matjang_compose.BuildConfig.KAKAO_REST_API_KEY // local.properties의 REST API 키 사용
 
     fun searchPlaces(centerLat: Double, centerLng: Double) {
         viewModelScope.launch {
