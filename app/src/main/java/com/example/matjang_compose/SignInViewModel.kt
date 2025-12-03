@@ -98,8 +98,7 @@ class SignInViewModel : ViewModel() {
                             }
                             .addOnFailureListener {
                                 Log.e("Firestore", "업데이트 실패")
-                                emitLoginSuccess()
-                            }
+                                emitSideEffect(LoginSideEffect.ShowSnackBar("유저 정보 업데이트에 실패했습니다. (DB)"))                            }
 
                     } else {
                         // 🔵 신규 회원: 생성
@@ -122,8 +121,7 @@ class SignInViewModel : ViewModel() {
                 }
                 .addOnFailureListener { e ->
                     Log.e("Firestore", "유저 조회 에러", e)
-                    emitLoginSuccess()
-                }
+                    emitSideEffect(LoginSideEffect.ShowSnackBar("로그인 처리 중 DB 조회 오류가 발생했습니다."))                }
         } ?: run {
             // userId가 null일 경우 (예외 상황)
             Log.e("Firestore", "saveUserToFirestore: User ID is null. Cannot save.")

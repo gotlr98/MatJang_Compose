@@ -106,7 +106,7 @@ fun MainMapView(
                             },
                             object : KakaoMapReadyCallback() {
                                 override fun onMapReady(map: KakaoMap) {
-                                    // ... 초기 설정 ...
+                                    // ...  초기 설정 ...
                                     map.moveCamera(CameraUpdateFactory.newCenterPosition(LatLng.from(latitude, longitude)))
                                     viewModel.searchPlaces(latitude, longitude)
 
