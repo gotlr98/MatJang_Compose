@@ -1,13 +1,11 @@
 package com.example.matjang_compose
 
-// viewmodel/MapViewModel.kt
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.getkeepsafe.relinker.BuildConfig
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import com.kakao.sdk.user.UserApiClient
@@ -23,23 +21,58 @@ class MainMapViewModel(
     private val apiService: KakaoLocalService // 의존성 주입
 ) : ViewModel() {
 
+    // 1. 지도에 표시될 맛집 리스트 (검색 결과)
     private val _matjips = MutableStateFlow<List<Matjip>>(emptyList())
     val matjips: StateFlow<List<Matjip>> = _matjips.asStateFlow()
 
-    // 1. 검색 결과 리스트 (핀을 지도에 표시할 때 사용)
+    // 2. 현재 선택된 맛집 (바텀 시트 표시용) - 중복된 _selectedPlace 제거함
     private val _selectedMatjip = MutableStateFlow<Matjip?>(null)
     val selectedMatjip: StateFlow<Matjip?> = _selectedMatjip.asStateFlow()
-    // 2. 바텀 시트에 표시할 선택된 장소 정보
-    private val _selectedPlace = MutableStateFlow<Matjip?>(null)
-    val selectedPlace: StateFlow<Matjip?> = _selectedPlace.asStateFlow()
 
-    private val REST_API_KEY = com.example.matjang_compose.BuildConfig.KAKAO_REST_API_KEY
-
+    // 3. 북마크 폴더 목록 (사이드 메뉴용)
     private val _bookmarkFolders = MutableStateFlow<List<BookmarkFolder>>(emptyList())
     val bookmarkFolders: StateFlow<List<BookmarkFolder>> = _bookmarkFolders.asStateFlow()
 
+    // 4. [추가됨] 폴더별 저장된 맛집 리스트 (Key: FolderId, Value: List<Matjip>)
+    // 사이드 메뉴에서 폴더를 펼쳤을 때 보여줄 데이터입니다.
+    private val _folderMatjips = MutableStateFlow<Map<String, List<Matjip>>>(emptyMap())
+    val folderMatjips: StateFlow<Map<String, List<Matjip>>> = _folderMatjips.asStateFlow()
+
+    // 5. 내 프로필 정보
+    private val _userProfile = MutableStateFlow<UserModel?>(null)
+    val userProfile: StateFlow<UserModel?> = _userProfile.asStateFlow()
+
+    // API Key & Firestore
+    private val REST_API_KEY = BuildConfig.KAKAO_REST_API_KEY
     private val db = Firebase.firestore
 
+    init {
+        // ViewModel 생성 시 내 정보 가져오기
+        fetchUserProfile()
+    }
+
+    // -----------------------------------------------------------
+    // 👤 유저 프로필 관련
+    // -----------------------------------------------------------
+    fun fetchUserProfile() {
+        UserApiClient.instance.me { user, error ->
+            if (user != null) {
+                // UserModel 매핑 오류 수정 완료
+                _userProfile.value = UserModel(
+                    id = user.id,
+                    nickname = user.kakaoAccount?.profile?.nickname ?: "이름 없음",
+                    profileImageUrl = user.kakaoAccount?.profile?.thumbnailImageUrl,
+                    email = user.kakaoAccount?.email ?: "이메일 없음"
+                )
+            }
+        }
+    }
+
+    // -----------------------------------------------------------
+    // 📂 북마크 폴더 및 저장 관련
+    // -----------------------------------------------------------
+
+    // 내 폴더 목록 가져오기
     fun fetchBookmarkFolders() {
         UserApiClient.instance.me { user, error ->
             if (user != null) {
@@ -62,11 +95,34 @@ class MainMapViewModel(
         }
     }
 
+    // [추가됨] 특정 폴더 내부의 맛집 리스트 가져오기 (사이드 메뉴 토글 시 호출)
+    fun fetchMatjipsInFolder(folderId: String) {
+        UserApiClient.instance.me { user, error ->
+            if (user != null) {
+                db.collection("users").document(user.id.toString())
+                    .collection("bookmark_folders").document(folderId)
+                    .collection("places")
+                    .get()
+                    .addOnSuccessListener { result ->
+                        val savedMatjips = result.documents.mapNotNull { doc ->
+                            doc.toObject(Matjip::class.java) // Matjip 객체로 변환
+                        }
+
+                        // 기존 Map 데이터를 복사해서 해당 폴더 ID의 데이터만 업데이트
+                        val currentMap = _folderMatjips.value.toMutableMap()
+                        currentMap[folderId] = savedMatjips
+                        _folderMatjips.value = currentMap
+                    }
+            }
+        }
+    }
+
+    // 새 폴더 생성
     fun createBookmarkFolder(folderName: String) {
         UserApiClient.instance.me { user, error ->
             if (user != null) {
                 val userId = user.id.toString()
-                val folderId = UUID.randomUUID().toString() // 랜덤 ID 생성
+                val folderId = UUID.randomUUID().toString()
                 val newFolder = BookmarkFolder(
                     id = folderId,
                     name = folderName
@@ -76,54 +132,56 @@ class MainMapViewModel(
                     .collection("bookmark_folders").document(folderId)
                     .set(newFolder)
                     .addOnSuccessListener {
-                        // 생성 후 목록 다시 갱신
-                        fetchBookmarkFolders()
-                        // (선택사항) 토스트 메시지 등 처리
+                        fetchBookmarkFolders() // 목록 갱신
                     }
             }
         }
     }
 
+    // 맛집을 특정 폴더에 저장
     fun addMatjipToFolder(folder: BookmarkFolder, matjip: Matjip) {
         UserApiClient.instance.me { user, error ->
             if (user != null) {
                 val userId = user.id.toString()
 
-                // 해당 폴더 하위의 'places' 컬렉션에 맛집 저장
                 db.collection("users").document(userId)
                     .collection("bookmark_folders").document(folder.id)
-                    .collection("places").document(matjip.id) // matjip.id를 문서 ID로 사용
+                    .collection("places").document(matjip.id)
                     .set(matjip)
                     .addOnSuccessListener {
                         Log.d("Firestore", "${folder.name}에 ${matjip.place_name} 저장 완료")
-                        // 여기서 UI에 "저장되었습니다" 스낵바 이벤트를 보내면 좋습니다.
+                        // 필요 시 여기서 스낵바 이벤트 발생
                     }
             }
         }
     }
 
+    // -----------------------------------------------------------
+    // 🗺️ 지도 검색 및 선택 관련
+    // -----------------------------------------------------------
+
+    // 카테고리 검색 (지도 이동 시 자동 검색용)
     fun searchPlaces(centerLat: Double, centerLng: Double) {
         viewModelScope.launch {
             try {
                 val response = apiService.searchByCategory(
                     apiKey = "KakaoAK $REST_API_KEY",
-                    x = centerLng, // 경도
-                    y = centerLat, // 위도
-                    radius = 1500 // 반경 1.5km 설정
+                    x = centerLng,
+                    y = centerLat,
+                    radius = 1500
                 )
-                // 성공적으로 데이터를 받아오면 상태 업데이트
                 _matjips.value = response.documents
 
             } catch (e: Exception) {
-                // 에러 처리 (로그 출력 또는 사용자에게 알림)
                 Log.e("MapViewModel", "카카오 로컬 API 요청 실패: ${e.message}")
                 _matjips.value = emptyList()
             }
         }
     }
 
+    // 키워드 검색 (검색창 입력용)
     fun searchByKeyword(keyword: String, centerLat: Double, centerLng: Double) {
-        if (keyword.isBlank()) return // 빈 검색어면 실행 안 함
+        if (keyword.isBlank()) return
 
         viewModelScope.launch {
             try {
@@ -133,9 +191,6 @@ class MainMapViewModel(
                     x = centerLng,
                     y = centerLat
                 )
-
-                // 검색 결과가 있으면 핀 업데이트
-                // (자동으로 MainMapView의 LaunchedEffect가 감지해서 핀을 다시 그림)
                 _matjips.value = response.documents
                 Log.d("MapViewModel", "키워드 검색 성공: ${keyword}, 결과 ${response.documents.size}개")
 
@@ -145,19 +200,20 @@ class MainMapViewModel(
         }
     }
 
-    // 핀 클릭 시 호출되어 바텀 시트를 띄울 장소를 설정
+    // 핀 선택 (바텀 시트 Open)
     fun selectMatjip(matjip: Matjip) {
         _selectedMatjip.value = matjip
     }
 
+    // 바텀 시트 Close
     fun dismissBottomSheet() {
         _selectedMatjip.value = null
     }
 
+    // 🏭 ViewModel Factory
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                // Retrofit 인스턴스 생성 (여기서 만들어줍니다)
                 val retrofit = Retrofit.Builder()
                     .baseUrl("https://dapi.kakao.com/")
                     .addConverterFactory(GsonConverterFactory.create())
@@ -165,7 +221,6 @@ class MainMapViewModel(
 
                 val apiService = retrofit.create(KakaoLocalService::class.java)
 
-                // ViewModel 생성 및 반환
                 MainMapViewModel(apiService)
             }
         }

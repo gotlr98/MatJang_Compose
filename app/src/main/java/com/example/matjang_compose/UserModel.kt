@@ -5,8 +5,9 @@ enum class Type {
 }
 
 data class UserModel(
-
-    val id: Long,
+    val id: Long? = 0,
+    val nickname: String = "",
+    val profileImageUrl: String? = null,
     val email: String = "",
     val type: Type = Type.Guest,
     val reviews: List<ReviewModel> = emptyList(),
