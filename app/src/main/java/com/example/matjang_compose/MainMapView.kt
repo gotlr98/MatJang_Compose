@@ -13,10 +13,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -56,12 +59,15 @@ fun MainMapView(
     val scope = rememberCoroutineScope()
 
     // ViewModel 데이터
-    val matjipPlaces by viewModel.matjips.collectAsState() // 검색된 맛집
+    val matjipPlaces by viewModel.matjips.collectAsState()
     val selectedMatjip by viewModel.selectedMatjip.collectAsState()
+    val currentMapMode by viewModel.mapMode.collectAsState()
 
     var kakaoMapController by remember { mutableStateOf<KakaoMap?>(null) }
     var searchText by remember { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
+
+    var isDropdownExpanded by remember { mutableStateOf(false) }
 
     // 🔍 검색 함수
     fun doSearch() {
@@ -74,6 +80,7 @@ fun MainMapView(
                 centerLng = cameraPos.longitude
             )
             focusManager.clearFocus()
+            viewModel.setMapMode(MapMode.SEARCH)
         }
     }
 
@@ -128,13 +135,16 @@ fun MainMapView(
                                     viewModel.searchPlaces(latitude, longitude)
 
                                     map.setOnCameraMoveEndListener { _, cameraPosition, _ ->
-                                        viewModel.searchPlaces(cameraPosition.position.latitude, cameraPosition.position.longitude)
+                                        if (currentMapMode == MapMode.SEARCH) {
+                                            viewModel.searchPlaces(cameraPosition.position.latitude, cameraPosition.position.longitude)
+                                        }
                                     }
 
                                     map.setOnLabelClickListener { _, _, label ->
                                         (label.tag as? Matjip)?.let { viewModel.selectMatjip(it) }
                                         true
                                     }
+
                                 }
                             }
                         )
@@ -166,19 +176,20 @@ fun MainMapView(
                     Icon(Icons.Default.Menu, contentDescription = "메뉴 열기", tint = Color.Black)
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
-
                 OutlinedTextField(
                     value = searchText,
                     onValueChange = { searchText = it },
-                    placeholder = { Text("맛집 검색") },
+                    placeholder = { Text("맛집 검색", style = MaterialTheme.typography.bodySmall) },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth().shadow(2.dp, RoundedCornerShape(12.dp)),
+                    modifier = Modifier
+                        .weight(1f) // 🚀 너비 유동적 조절
+                        .height(50.dp)
+                        .shadow(2.dp, RoundedCornerShape(12.dp)),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
-                        focusedBorderColor = Color.Transparent, // 테두리 깔끔하게
+                        focusedBorderColor = Color.Transparent,
                         unfocusedBorderColor = Color.Transparent
                     ),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -187,13 +198,89 @@ fun MainMapView(
                         IconButton(onClick = { doSearch() }) {
                             Icon(Icons.Default.Search, contentDescription = "검색")
                         }
-                    }
+                    },
                 )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Box {
+                    Button(
+                        onClick = { isDropdownExpanded = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .height(50.dp)
+                            .shadow(2.dp, RoundedCornerShape(12.dp)),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        Text(text = currentMapMode.title, color = Color.Black, style = MaterialTheme.typography.bodySmall)
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.Black)
+                    }
+
+                    DropdownMenu(
+                        expanded = isDropdownExpanded,
+                        onDismissRequest = { isDropdownExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("지도 탐색 (빠름)") },
+                            onClick = {
+                                viewModel.setMapMode(MapMode.EXPLORE)
+                                isDropdownExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("맛집 찾기 (자동)") },
+                            onClick = {
+                                viewModel.setMapMode(MapMode.SEARCH)
+                                isDropdownExpanded = false
+                                // 모드 변경 시 즉시 현재 위치에서 검색 실행
+                                val pos = kakaoMapController?.cameraPosition?.position
+                                if (pos != null) viewModel.searchPlaces(pos.latitude, pos.longitude)
+                            }
+                        )
+                    }
+                }
             }
 
-            // (3) 핀 그리기 로직 (LaunchedEffect)
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 100.dp) // 바텀 시트 위쪽으로 배치
+            ) {
+                // Zoom In (+)
+                FloatingActionButton(
+                    onClick = {
+                        kakaoMapController?.moveCamera(CameraUpdateFactory.zoomIn())
+                    },
+                    containerColor = Color.White,
+                    contentColor = Color.Black,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "확대")
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Zoom Out (-)
+                FloatingActionButton(
+                    onClick = {
+                        kakaoMapController?.moveCamera(CameraUpdateFactory.zoomOut())
+                    },
+                    containerColor = Color.White,
+                    contentColor = Color.Black,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(Icons.Default.Remove, contentDescription = "축소")
+                }
+            }
+
+            // 핀 그리기 로직 (LaunchedEffect)
             LaunchedEffect(kakaoMapController, matjipPlaces) {
                 val map = kakaoMapController ?: return@LaunchedEffect
+
+                // 탐색 모드일 때는 핀 업데이트를 하지 않거나, 기존 핀을 유지할 수 있음
+                // 여기서는 matjipPlaces가 바뀌면 무조건 그립니다.
+
                 map.labelManager?.let { manager ->
                     val layerId = "MatjipPinsLayer"
                     var layer = manager.getLayer(layerId)
@@ -203,10 +290,14 @@ fun MainMapView(
                         layer.removeAll()
                     }
 
+                    // 핀 스타일 생성
                     val textStyle = LabelTextStyle.from(30, Color.Black.toArgb())
+                    // 🚨 중요: R.drawable.ic_pin_marker 이미지가 없으면 기본 아이콘이라도 사용해야 함
+                    // 리소스 ID가 유효해야 앱이 안 꺼집니다.
                     val pinStyle = LabelStyle.from(R.drawable.ic_pin_marker)
                         .setTextStyles(textStyle)
                         .setAnchorPoint(0.5f, 1.0f)
+
                     val styles = LabelStyles.from(pinStyle)
 
                     matjipPlaces.forEach { matjip ->
@@ -214,12 +305,13 @@ fun MainMapView(
                             .setStyles(styles)
                             .setTag(matjip)
                             .setTexts(LabelTextBuilder().setTexts(matjip.place_name))
+
                         layer?.addLabel(pinOptions)
                     }
                 }
             }
 
-            // (4) 바텀 시트
+            // 바텀 시트
             selectedMatjip?.let { matjip ->
                 MatjipBottomSheet(
                     matjip = matjip,

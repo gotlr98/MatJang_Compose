@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -61,7 +62,7 @@ fun MatjipBottomSheet(
                     showBookmarkDialog = true
                 }) {
                     Icon(
-                        imageVector = Icons.Default.BookmarkBorder,
+                        imageVector = Icons.Default.Bookmark,
                         contentDescription = "북마크 저장",
                         tint = MaterialTheme.colorScheme.primary
                     )

@@ -17,42 +17,52 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.UUID
 
+enum class MapMode(val title: String) {
+    EXPLORE("지도 탐색"), // 지도만 이동 (검색 X)
+    SEARCH("맛집 찾기")   // 이동 시 자동 검색
+}
+
 class MainMapViewModel(
     private val apiService: KakaoLocalService // 의존성 주입
 ) : ViewModel() {
 
-    // 1. 지도에 표시될 맛집 리스트 (검색 결과)
+    // 지도에 표시될 맛집 리스트 (검색 결과)
     private val _matjips = MutableStateFlow<List<Matjip>>(emptyList())
     val matjips: StateFlow<List<Matjip>> = _matjips.asStateFlow()
 
-    // 2. 현재 선택된 맛집 (바텀 시트 표시용) - 중복된 _selectedPlace 제거함
+    // 현재 선택된 맛집 (바텀 시트 표시용) - 중복된 _selectedPlace 제거함
     private val _selectedMatjip = MutableStateFlow<Matjip?>(null)
     val selectedMatjip: StateFlow<Matjip?> = _selectedMatjip.asStateFlow()
 
-    // 3. 북마크 폴더 목록 (사이드 메뉴용)
+    // 북마크 폴더 목록 (사이드 메뉴용)
     private val _bookmarkFolders = MutableStateFlow<List<BookmarkFolder>>(emptyList())
     val bookmarkFolders: StateFlow<List<BookmarkFolder>> = _bookmarkFolders.asStateFlow()
 
-    // 4. [추가됨] 폴더별 저장된 맛집 리스트 (Key: FolderId, Value: List<Matjip>)
-    // 사이드 메뉴에서 폴더를 펼쳤을 때 보여줄 데이터입니다.
+    // 폴더별 저장된 맛집 리스트 (Key: FolderId, Value: List<Matjip>)
     private val _folderMatjips = MutableStateFlow<Map<String, List<Matjip>>>(emptyMap())
     val folderMatjips: StateFlow<Map<String, List<Matjip>>> = _folderMatjips.asStateFlow()
 
-    // 5. 내 프로필 정보
+    // 내 프로필 정보
     private val _userProfile = MutableStateFlow<UserModel?>(null)
     val userProfile: StateFlow<UserModel?> = _userProfile.asStateFlow()
+
+    private val _mapMode = MutableStateFlow(MapMode.EXPLORE)
+    val mapMode: StateFlow<MapMode> = _mapMode.asStateFlow()
 
     // API Key & Firestore
     private val REST_API_KEY = BuildConfig.KAKAO_REST_API_KEY
     private val db = Firebase.firestore
 
     init {
-        // ViewModel 생성 시 내 정보 가져오기
         fetchUserProfile()
     }
 
+    fun setMapMode(mode: MapMode) {
+        _mapMode.value = mode
+    }
+
     // -----------------------------------------------------------
-    // 👤 유저 프로필 관련
+    // 유저 프로필 관련
     // -----------------------------------------------------------
     fun fetchUserProfile() {
         UserApiClient.instance.me { user, error ->

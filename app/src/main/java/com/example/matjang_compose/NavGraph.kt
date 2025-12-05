@@ -1,6 +1,5 @@
 package com.example.matjang_compose
 
-import MainMapView
 import android.util.Log
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
