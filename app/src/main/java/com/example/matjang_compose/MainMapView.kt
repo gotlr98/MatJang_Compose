@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,7 +16,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
@@ -30,10 +31,10 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kakao.vectormap.KakaoMap
 import com.kakao.vectormap.KakaoMapReadyCallback
@@ -45,8 +46,6 @@ import com.kakao.vectormap.label.LabelLayerOptions
 import com.kakao.vectormap.label.LabelOptions
 import com.kakao.vectormap.label.LabelStyle
 import com.kakao.vectormap.label.LabelStyles
-import com.kakao.vectormap.label.LabelTextBuilder
-import com.kakao.vectormap.label.LabelTextStyle
 import kotlinx.coroutines.launch
 
 @Composable
@@ -58,7 +57,7 @@ fun MainMapView(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    // ViewModel 데이터
+    // ViewModel 데이터 구독
     val matjipPlaces by viewModel.matjips.collectAsState()
     val selectedMatjip by viewModel.selectedMatjip.collectAsState()
     val currentMapMode by viewModel.mapMode.collectAsState()
@@ -66,10 +65,12 @@ fun MainMapView(
     var kakaoMapController by remember { mutableStateOf<KakaoMap?>(null) }
     var searchText by remember { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
-
     var isDropdownExpanded by remember { mutableStateOf(false) }
 
-    // 🔍 검색 함수
+    val isDrawerOpen = drawerState.currentValue != DrawerValue.Closed
+
+    var mapViewInstance by remember { mutableStateOf<MapView?>(null) }
+
     fun doSearch() {
         val map = kakaoMapController ?: return
         val cameraPos = map.cameraPosition?.position
@@ -84,16 +85,12 @@ fun MainMapView(
         }
     }
 
-    // 📍 사이드 메뉴에서 맛집 클릭 시 실행할 함수
     val onSideMenuMatjipClick: (Matjip) -> Unit = { matjip ->
         scope.launch {
-            // 1. 지도 이동
             kakaoMapController?.moveCamera(
                 CameraUpdateFactory.newCenterPosition(LatLng.from(matjip.y, matjip.x))
             )
-            // 2. 핀 선택 (바텀 시트 올라옴)
             viewModel.selectMatjip(matjip)
-            // 3. 메뉴 닫기
             drawerState.close()
         }
     }
@@ -102,19 +99,13 @@ fun MainMapView(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                modifier = Modifier
-                    .fillMaxWidth(0.7f) // 너비 70%
-                    .fillMaxHeight(),
+                modifier = Modifier.fillMaxWidth(0.7f).fillMaxHeight(),
                 drawerContainerColor = Color.White
             ) {
-                // 👇 사이드 메뉴 UI 연결
-                SideMenuContent(
-                    viewModel = viewModel,
-                    onMatjipClick = onSideMenuMatjipClick
-                )
+                SideMenuContent(viewModel = viewModel, onMatjipClick = onSideMenuMatjipClick)
             }
         },
-        gesturesEnabled = true
+        gesturesEnabled = false
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
 
@@ -123,6 +114,7 @@ fun MainMapView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
                     MapView(context).apply {
+                        mapViewInstance = this
                         start(
                             object : MapLifeCycleCallback() {
                                 override fun onMapDestroy() {}
@@ -132,10 +124,10 @@ fun MainMapView(
                                 override fun onMapReady(map: KakaoMap) {
                                     kakaoMapController = map
                                     map.moveCamera(CameraUpdateFactory.newCenterPosition(LatLng.from(latitude, longitude)))
-                                    viewModel.searchPlaces(latitude, longitude)
 
+                                    // 리스너에서 viewModel의 최신 값을 직접 확인
                                     map.setOnCameraMoveEndListener { _, cameraPosition, _ ->
-                                        if (currentMapMode == MapMode.SEARCH) {
+                                        if (viewModel.mapMode.value == MapMode.SEARCH) {
                                             viewModel.searchPlaces(cameraPosition.position.latitude, cameraPosition.position.longitude)
                                         }
                                     }
@@ -144,15 +136,33 @@ fun MainMapView(
                                         (label.tag as? Matjip)?.let { viewModel.selectMatjip(it) }
                                         true
                                     }
-
                                 }
                             }
                         )
                     }
                 }
             )
+            if (isDrawerOpen) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(9999f) // 최상위 배치 (중요!!!)
+                        .background(Color.Black.copy(alpha = 0.01f)) // 거의 안보이지만 터치 인식됨
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            scope.launch { drawerState.close() }
+                        }
+                )
+            }
 
-            // (2) 검색창 & 메뉴 버튼 Row
+//            LaunchedEffect(isDrawerOpen) {
+//                mapViewInstance?.isClickable = !isDrawerOpen
+//                // MapView가 터치를 비활성화하면, Compose의 Scrim (메뉴 바깥의 기본 닫기 영역)이 제대로 작동
+//            }
+
+            // (2) 상단 컨트롤 바
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -162,19 +172,16 @@ fun MainMapView(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = {
-                        scope.launch {
-                            drawerState.open()
-                            viewModel.fetchBookmarkFolders() // 메뉴 열 때 폴더 목록 갱신
-                        }
-                    },
+                    onClick = { scope.launch { drawerState.open(); viewModel.fetchBookmarkFolders() } },
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(40.dp)
                         .background(Color.White, CircleShape)
-                        .shadow(elevation = 4.dp, shape = CircleShape)
+                        .shadow(2.dp, CircleShape)
                 ) {
-                    Icon(Icons.Default.Menu, contentDescription = "메뉴 열기", tint = Color.Black)
+                    Icon(Icons.Default.Menu, contentDescription = "메뉴", tint = Color.Black)
                 }
+
+                Spacer(modifier = Modifier.width(8.dp))
 
                 OutlinedTextField(
                     value = searchText,
@@ -182,7 +189,7 @@ fun MainMapView(
                     placeholder = { Text("맛집 검색", style = MaterialTheme.typography.bodySmall) },
                     singleLine = true,
                     modifier = Modifier
-                        .weight(1f) // 🚀 너비 유동적 조절
+                        .weight(1f)
                         .height(50.dp)
                         .shadow(2.dp, RoundedCornerShape(12.dp)),
                     shape = RoundedCornerShape(12.dp),
@@ -198,7 +205,7 @@ fun MainMapView(
                         IconButton(onClick = { doSearch() }) {
                             Icon(Icons.Default.Search, contentDescription = "검색")
                         }
-                    },
+                    }
                 )
 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -222,18 +229,17 @@ fun MainMapView(
                         onDismissRequest = { isDropdownExpanded = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("지도 탐색 (빠름)") },
+                            text = { Text("지도 탐색") },
                             onClick = {
                                 viewModel.setMapMode(MapMode.EXPLORE)
                                 isDropdownExpanded = false
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("맛집 찾기 (자동)") },
+                            text = { Text("맛집 찾기") },
                             onClick = {
                                 viewModel.setMapMode(MapMode.SEARCH)
                                 isDropdownExpanded = false
-                                // 모드 변경 시 즉시 현재 위치에서 검색 실행
                                 val pos = kakaoMapController?.cameraPosition?.position
                                 if (pos != null) viewModel.searchPlaces(pos.latitude, pos.longitude)
                             }
@@ -242,16 +248,14 @@ fun MainMapView(
                 }
             }
 
+            // (3) 줌 컨트롤
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 100.dp) // 바텀 시트 위쪽으로 배치
+                    .padding(end = 16.dp, bottom = 100.dp)
             ) {
-                // Zoom In (+)
                 FloatingActionButton(
-                    onClick = {
-                        kakaoMapController?.moveCamera(CameraUpdateFactory.zoomIn())
-                    },
+                    onClick = { kakaoMapController?.moveCamera(CameraUpdateFactory.zoomIn()) },
                     containerColor = Color.White,
                     contentColor = Color.Black,
                     modifier = Modifier.size(48.dp)
@@ -261,11 +265,8 @@ fun MainMapView(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Zoom Out (-)
                 FloatingActionButton(
-                    onClick = {
-                        kakaoMapController?.moveCamera(CameraUpdateFactory.zoomOut())
-                    },
+                    onClick = { kakaoMapController?.moveCamera(CameraUpdateFactory.zoomOut()) },
                     containerColor = Color.White,
                     contentColor = Color.Black,
                     modifier = Modifier.size(48.dp)
@@ -274,12 +275,9 @@ fun MainMapView(
                 }
             }
 
-            // 핀 그리기 로직 (LaunchedEffect)
+            // (4) 핀 그리기 로직
             LaunchedEffect(kakaoMapController, matjipPlaces) {
                 val map = kakaoMapController ?: return@LaunchedEffect
-
-                // 탐색 모드일 때는 핀 업데이트를 하지 않거나, 기존 핀을 유지할 수 있음
-                // 여기서는 matjipPlaces가 바뀌면 무조건 그립니다.
 
                 map.labelManager?.let { manager ->
                     val layerId = "MatjipPinsLayer"
@@ -290,12 +288,7 @@ fun MainMapView(
                         layer.removeAll()
                     }
 
-                    // 핀 스타일 생성
-                    val textStyle = LabelTextStyle.from(30, Color.Black.toArgb())
-                    // 🚨 중요: R.drawable.ic_pin_marker 이미지가 없으면 기본 아이콘이라도 사용해야 함
-                    // 리소스 ID가 유효해야 앱이 안 꺼집니다.
                     val pinStyle = LabelStyle.from(R.drawable.ic_pin_marker)
-                        .setTextStyles(textStyle)
                         .setAnchorPoint(0.5f, 1.0f)
 
                     val styles = LabelStyles.from(pinStyle)
@@ -304,198 +297,158 @@ fun MainMapView(
                         val pinOptions = LabelOptions.from(LatLng.from(matjip.y, matjip.x))
                             .setStyles(styles)
                             .setTag(matjip)
-                            .setTexts(LabelTextBuilder().setTexts(matjip.place_name))
 
                         layer?.addLabel(pinOptions)
                     }
                 }
             }
 
-            // 바텀 시트
+            // (5) 바텀 시트
             selectedMatjip?.let { matjip ->
-                MatjipBottomSheet(
-                    matjip = matjip,
-                    onDismiss = { viewModel.dismissBottomSheet() }
-                )
+                Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+                    MatjipBottomSheet(
+                        matjip = matjip,
+                        onDismiss = { viewModel.dismissBottomSheet() }
+                    )
+                }
             }
         }
     }
 }
 
-// 🎨 사이드 메뉴 컨텐츠 구현
+// 👇 사이드 메뉴 관련 컴포저블 함수들 (유지)
+
 @Composable
 fun SideMenuContent(
     viewModel: MainMapViewModel,
     onMatjipClick: (Matjip) -> Unit
 ) {
     val userProfile by viewModel.userProfile.collectAsState()
-    val folders by viewModel.bookmarkFolders.collectAsState()
+    val bookmarkFolders by viewModel.bookmarkFolders.collectAsState()
     val folderMatjips by viewModel.folderMatjips.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
-
-        // 1️⃣ 상단 프로필 영역 (화면의 약 1/4)
-        Box(
+        // 🧑‍💻 프로필 영역
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.25f) // 전체 높이의 25% 차지
-                .background(Color(0xFFF5F5F5)), // 배경색 (연한 회색)
-            contentAlignment = Alignment.CenterStart
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.Center
-            ) {
-                // 프로필 이미지
-                Surface(
-                    shape = CircleShape,
-                    modifier = Modifier.size(80.dp),
-                    color = Color.White,
-                    shadowElevation = 2.dp
-                ) {
-                    // Coil 라이브러리가 있다면 AsyncImage 사용 권장
-                    // AsyncImage(model = userProfile?.profileImageUrl, contentDescription = null)
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "프로필 이미지",
-                        modifier = Modifier.padding(16.dp),
-                        tint = Color.Gray
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 닉네임 & 이메일
+            Icon(
+                Icons.Default.Person,
+                contentDescription = "프로필",
+                modifier = Modifier.size(40.dp)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column {
                 Text(
-                    text = userProfile?.nickname ?: "로그인이 필요합니다",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    text = userProfile?.nickname ?: "Guest",
+                    style = MaterialTheme.typography.titleLarge
                 )
                 Text(
-                    text = userProfile?.email ?: "",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray
+                    text = userProfile?.email ?: "로그인 정보 없음",
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
         }
 
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // 📚 폴더 리스트
+        Text(
+            "나의 북마크 폴더",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+
         Divider()
 
-        // 2️⃣ 하단 북마크 리스트 영역 (나머지 3/4)
-        Column(
-            modifier = Modifier
-                .weight(0.75f)
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Text(
-                text = "내 맛집 리스트",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            if (folders.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("저장된 리스트가 없습니다.", color = Color.Gray)
-                }
-            } else {
-                LazyColumn {
-                    items(folders) { folder ->
-                        // 폴더 아이템 (확장/축소 가능)
-                        FolderItem(
-                            folderName = folder.name,
-                            matjips = folderMatjips[folder.id] ?: emptyList(),
-                            onExpandClick = {
-                                // 폴더 클릭 시 해당 폴더 데이터 가져오기 요청
-                                viewModel.fetchMatjipsInFolder(folder.id)
-                            },
-                            onMatjipClick = onMatjipClick
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                }
+        LazyColumn {
+            items(bookmarkFolders) { folder ->
+                FolderItem(
+                    folder = folder,
+                    viewModel = viewModel,
+                    onMatjipClick = onMatjipClick,
+                    savedMatjips = folderMatjips[folder.id] ?: emptyList()
+                )
             }
         }
     }
 }
 
-// 📂 개별 폴더 아이템 (Toggle 기능 포함)
+// 📂 폴더 아이템 컴포넌트
 @Composable
 fun FolderItem(
-    folderName: String,
-    matjips: List<Matjip>,
-    onExpandClick: () -> Unit,
-    onMatjipClick: (Matjip) -> Unit
+    folder: BookmarkFolder,
+    viewModel: MainMapViewModel,
+    onMatjipClick: (Matjip) -> Unit,
+    savedMatjips: List<Matjip>
 ) {
-    var isExpanded by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
+    val rotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "rotation")
 
-    // 화살표 회전 애니메이션
-    val rotationState by animateFloatAsState(targetValue = if (isExpanded) 180f else 0f, label = "rotation")
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    expanded = !expanded
+                    if (expanded) {
+                        viewModel.fetchMatjipsInFolder(folder.id)
+                    }
+                }
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Folder, contentDescription = "폴더", tint = MaterialTheme.colorScheme.secondary)
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(folder.name, modifier = Modifier.weight(1f))
+            Text("(${savedMatjips.size})", style = MaterialTheme.typography.bodySmall)
+            Icon(
+                Icons.Default.ArrowDropDown,
+                contentDescription = "확장",
+                modifier = Modifier.rotate(rotation)
+            )
+        }
 
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = Modifier.fillMaxWidth()
+        // 📌 폴더 내용 (맛집 리스트)
+        AnimatedVisibility(visible = expanded) {
+            Column(modifier = Modifier.padding(start = 24.dp)) {
+                if (savedMatjips.isEmpty()) {
+                    Text(
+                        "저장된 맛집이 없습니다.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)
+                    )
+                } else {
+                    savedMatjips.forEach { matjip ->
+                        MatjipItem(matjip = matjip, onMatjipClick = onMatjipClick)
+                        Divider(Modifier.padding(horizontal = 16.dp))
+                    }
+                }
+            }
+        }
+        Divider()
+    }
+}
+
+// 🍽️ 맛집 아이템 컴포넌트
+@Composable
+fun MatjipItem(matjip: Matjip, onMatjipClick: (Matjip) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onMatjipClick(matjip) }
+            .padding(vertical = 12.dp, horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        Icon(Icons.Default.Place, contentDescription = "장소", modifier = Modifier.size(20.dp))
+        Spacer(modifier = Modifier.width(8.dp))
         Column {
-            // 1. 폴더 헤더 (클릭 시 토글)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        isExpanded = !isExpanded
-                        if (isExpanded) onExpandClick() // 열릴 때 데이터 로드
-                    }
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Place, contentDescription = null, tint = Color(0xFFFFC107))
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(text = folderName, style = MaterialTheme.typography.titleMedium)
-                }
-
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = "펼치기",
-                    modifier = Modifier.rotate(rotationState)
-                )
-            }
-
-            // 2. 확장된 맛집 리스트
-            AnimatedVisibility(visible = isExpanded) {
-                Column(modifier = Modifier.background(Color(0xFFFAFAFA))) {
-                    if (matjips.isEmpty()) {
-                        Text(
-                            text = "저장된 맛집이 없습니다.",
-                            modifier = Modifier.padding(16.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
-                        )
-                    } else {
-                        matjips.forEach { matjip ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onMatjipClick(matjip) } // 📌 클릭 시 지도 이동
-                                    .padding(horizontal = 24.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.Place, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = matjip.place_name,
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                            Divider(color = Color.LightGray, thickness = 0.5.dp)
-                        }
-                    }
-                }
-            }
+            Text(matjip.place_name, style = MaterialTheme.typography.bodyMedium)
+            Text(matjip.category_name.split(" > ").last(), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
         }
     }
 }
