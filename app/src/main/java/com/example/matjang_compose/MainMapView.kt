@@ -105,6 +105,7 @@ fun MainMapView(
                 SideMenuContent(viewModel = viewModel, onMatjipClick = onSideMenuMatjipClick)
             }
         },
+        // 1. 닫힌 상태에서 제스처로 열리는 것 방지 (유지)
         gesturesEnabled = false
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -114,7 +115,7 @@ fun MainMapView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
                     MapView(context).apply {
-                        mapViewInstance = this
+                        mapViewInstance = this // MapView 인스턴스 저장
                         start(
                             object : MapLifeCycleCallback() {
                                 override fun onMapDestroy() {}
@@ -142,25 +143,25 @@ fun MainMapView(
                     }
                 }
             )
-            if (isDrawerOpen) {
+
+            // ❌ 수동 닫기 Box 제거: 이 로직은 MapView에 의해 터치가 가로채져 작동하지 않았습니다.
+            /* if (isDrawerOpen) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .zIndex(9999f) // 최상위 배치 (중요!!!)
-                        .background(Color.Black.copy(alpha = 0.01f)) // 거의 안보이지만 터치 인식됨
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) {
-                            scope.launch { drawerState.close() }
-                        }
+                        .zIndex(9999f)
+                        .background(Color.Black.copy(alpha = 0.01f))
+                        .clickable(...)
                 )
             }
+            */
 
-//            LaunchedEffect(isDrawerOpen) {
-//                mapViewInstance?.isClickable = !isDrawerOpen
-//                // MapView가 터치를 비활성화하면, Compose의 Scrim (메뉴 바깥의 기본 닫기 영역)이 제대로 작동
-//            }
+            // ⭐ 2. 최종 해결책: Drawer 상태에 따라 MapView의 터치 기능을 직접 제어
+            LaunchedEffect(isDrawerOpen) {
+                // Drawer가 열려있을 때(isDrawerOpen == true) MapView의 터치를 비활성화합니다.
+                // MapView 터치가 비활성화되면, Compose의 기본 Scrim 및 제스처가 작동하여 닫힙니다.
+                mapViewInstance?.isClickable = !isDrawerOpen
+            }
 
             // (2) 상단 컨트롤 바
             Row(
