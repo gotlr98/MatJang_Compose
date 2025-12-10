@@ -67,10 +67,6 @@ fun MainMapView(
     val focusManager = LocalFocusManager.current
     var isDropdownExpanded by remember { mutableStateOf(false) }
 
-    val isDrawerOpen = drawerState.currentValue != DrawerValue.Closed
-
-    var mapViewInstance by remember { mutableStateOf<MapView?>(null) }
-
     fun doSearch() {
         val map = kakaoMapController ?: return
         val cameraPos = map.cameraPosition?.position
@@ -95,6 +91,9 @@ fun MainMapView(
         }
     }
 
+    // 💡 핵심 수정: Drawer가 열려있을 때만 제스처를 활성화합니다.
+    // 닫혀있음 -> gesturesEnabled = false (지도 드래그 가능, 메뉴 안 열림)
+    // 열려있음 -> gesturesEnabled = true (지도 터치 차단됨, 스와이프/바깥터치로 닫기 가능)
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -105,8 +104,8 @@ fun MainMapView(
                 SideMenuContent(viewModel = viewModel, onMatjipClick = onSideMenuMatjipClick)
             }
         },
-        // 1. 닫힌 상태에서 제스처로 열리는 것 방지 (유지)
-        gesturesEnabled = false
+        // ✅ 사용자님 아이디어 적용: 열려있을 때만 제스처 켜기
+        gesturesEnabled = drawerState.isOpen
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
 
@@ -115,7 +114,6 @@ fun MainMapView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
                     MapView(context).apply {
-                        mapViewInstance = this // MapView 인스턴스 저장
                         start(
                             object : MapLifeCycleCallback() {
                                 override fun onMapDestroy() {}
@@ -143,25 +141,6 @@ fun MainMapView(
                     }
                 }
             )
-
-            // ❌ 수동 닫기 Box 제거: 이 로직은 MapView에 의해 터치가 가로채져 작동하지 않았습니다.
-            /* if (isDrawerOpen) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .zIndex(9999f)
-                        .background(Color.Black.copy(alpha = 0.01f))
-                        .clickable(...)
-                )
-            }
-            */
-
-            // ⭐ 2. 최종 해결책: Drawer 상태에 따라 MapView의 터치 기능을 직접 제어
-            LaunchedEffect(isDrawerOpen) {
-                // Drawer가 열려있을 때(isDrawerOpen == true) MapView의 터치를 비활성화합니다.
-                // MapView 터치가 비활성화되면, Compose의 기본 Scrim 및 제스처가 작동하여 닫힙니다.
-                mapViewInstance?.isClickable = !isDrawerOpen
-            }
 
             // (2) 상단 컨트롤 바
             Row(
