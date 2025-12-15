@@ -67,6 +67,19 @@ fun MainMapView(
     val focusManager = LocalFocusManager.current
     var isDropdownExpanded by remember { mutableStateOf(false) }
 
+    val bookmarkFolders by viewModel.bookmarkFolders.collectAsState()
+    val folderMatjips by viewModel.folderMatjips.collectAsState()
+
+    val savedCount = remember(selectedMatjip, folderMatjips) {
+        if (selectedMatjip == null) 0
+        else {
+            // 전체 폴더 맵(folderMatjips)을 순회하며 내 맛집 ID가 포함된 폴더 수 카운트
+            bookmarkFolders.count { folder ->
+                folderMatjips[folder.id]?.any { it.id == selectedMatjip?.id } == true
+            }
+        }
+    }
+
     fun doSearch() {
         val map = kakaoMapController ?: return
         val cameraPos = map.cameraPosition?.position
@@ -91,9 +104,8 @@ fun MainMapView(
         }
     }
 
-    // 💡 핵심 수정: Drawer가 열려있을 때만 제스처를 활성화합니다.
-    // 닫혀있음 -> gesturesEnabled = false (지도 드래그 가능, 메뉴 안 열림)
-    // 열려있음 -> gesturesEnabled = true (지도 터치 차단됨, 스와이프/바깥터치로 닫기 가능)
+    // Drawer가 열려있을 때만 제스처를 활성화
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -104,7 +116,6 @@ fun MainMapView(
                 SideMenuContent(viewModel = viewModel, onMatjipClick = onSideMenuMatjipClick)
             }
         },
-        // ✅ 사용자님 아이디어 적용: 열려있을 때만 제스처 켜기
         gesturesEnabled = drawerState.isOpen
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -256,30 +267,63 @@ fun MainMapView(
             }
 
             // (4) 핀 그리기 로직
+            val context = androidx.compose.ui.platform.LocalContext.current
+
             LaunchedEffect(kakaoMapController, matjipPlaces) {
+                // 1. 맵 컨트롤러가 준비되지 않았거나, 데이터가 없으면 실행하지 않음
                 val map = kakaoMapController ?: return@LaunchedEffect
+                val labelManager = map.labelManager ?: return@LaunchedEffect
 
-                map.labelManager?.let { manager ->
-                    val layerId = "MatjipPinsLayer"
-                    var layer = manager.getLayer(layerId)
-                    if (layer == null) {
-                        layer = manager.addLayer(LabelLayerOptions.from(layerId))
-                    } else {
-                        layer.removeAll()
-                    }
+                // 데이터가 비어있어도 기존 핀을 지우기 위해 진행은 하되, 로그 확인용
+                android.util.Log.d("MatjipMap", "핀 그리기 시도: 데이터 개수 = ${matjipPlaces.size}")
 
-                    val pinStyle = LabelStyle.from(R.drawable.ic_pin_marker)
-                        .setAnchorPoint(0.5f, 1.0f)
+                val layerId = "MatjipPinsLayer"
+                val layer = labelManager.getLayer(layerId)
+                    ?: labelManager.addLayer(LabelLayerOptions.from(layerId).setZOrder(10000))
 
-                    val styles = LabelStyles.from(pinStyle)
+                // 기존 핀 제거 (중복 방지)
+                layer?.removeAll()
 
-                    matjipPlaces.forEach { matjip ->
-                        val pinOptions = LabelOptions.from(LatLng.from(matjip.y, matjip.x))
-                            .setStyles(styles)
-                            .setTag(matjip)
+                if (matjipPlaces.isEmpty()) return@LaunchedEffect
 
-                        layer?.addLabel(pinOptions)
-                    }
+                // 벡터(XML) 이미지를 비트맵으로 변환
+                val bitmap = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_pin_marker)?.let { drawable ->
+                    val canvasBitmap = android.graphics.Bitmap.createBitmap(
+                        drawable.intrinsicWidth,
+                        drawable.intrinsicHeight,
+                        android.graphics.Bitmap.Config.ARGB_8888
+                    )
+                    val canvas = android.graphics.Canvas(canvasBitmap)
+                    drawable.setBounds(0, 0, canvas.width, canvas.height)
+                    drawable.draw(canvas)
+                    canvasBitmap
+                }
+
+                if (bitmap == null) {
+                    android.util.Log.e("MatjipMap", "이미지 변환 실패: ic_pin_marker를 찾을 수 없거나 변환 불가")
+                    return@LaunchedEffect
+                }
+
+                // 2. 스타일 생성 (변환된 비트맵 사용)
+                val pinStyle = LabelStyle.from(bitmap)
+                    .setAnchorPoint(0.5f, 1.0f) // 하단 중앙을 좌표에 맞춤
+
+                val styles = LabelStyles.from(pinStyle)
+
+                // 3. LabelOptions 리스트 생성 (배치 처리)
+                val labelOptionsList = matjipPlaces.map { matjip ->
+                    LabelOptions.from(LatLng.from(matjip.y, matjip.x))
+                        .setStyles(styles)
+                        .setClickable(true)
+                        .setTag(matjip)
+                }
+
+                // 4. 한 번에 추가 (SDK 권장 방식)
+                try {
+                    layer?.addLabels(labelOptionsList)
+                    android.util.Log.d("MatjipMap", "핀 ${labelOptionsList.size}개 추가 완료")
+                } catch (e: Exception) {
+                    android.util.Log.e("MatjipMap", "핀 추가 중 오류 발생: ${e.message}")
                 }
             }
 
@@ -288,7 +332,13 @@ fun MainMapView(
                 Box(modifier = Modifier.align(Alignment.BottomCenter)) {
                     MatjipBottomSheet(
                         matjip = matjip,
-                        onDismiss = { viewModel.dismissBottomSheet() }
+                        savedCount = savedCount, // 👈 [추가] 계산된 카운트 전달
+                        onDismiss = { viewModel.dismissBottomSheet() },
+                        // 북마크 클릭 시 동작 (기존에 구현하신 로직 연결)
+                        onBookmarkClick = {
+                            // 여기에 폴더 선택 다이얼로그 띄우는 로직 등
+                            // viewModel.showBookmarkDialog(matjip)
+                        }
                     )
                 }
             }

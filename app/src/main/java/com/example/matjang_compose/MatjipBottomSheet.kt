@@ -1,14 +1,17 @@
 // MatjipBottomSheet.kt
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.matjang_compose.Matjip
@@ -25,8 +29,10 @@ import com.example.matjang_compose.MainMapViewModel
 @Composable
 fun MatjipBottomSheet(
     matjip: Matjip,
+    savedCount: Int, // 저장된 폴더 개수 (MainMapView에서 전달받음)
     onDismiss: () -> Unit,
-    viewModel: MainMapViewModel = viewModel(factory = MainMapViewModel.Factory) // ViewModel 주입
+    viewModel: MainMapViewModel = viewModel(factory = MainMapViewModel.Factory), // ViewModel 주입
+    onBookmarkClick: () -> Unit // (필요 시 사용, 현재는 내부에서 처리 중)
 ) {
     // 다이얼로그 표시 상태 관리
     var showBookmarkDialog by remember { mutableStateOf(false) }
@@ -55,17 +61,44 @@ fun MatjipBottomSheet(
                     modifier = Modifier.weight(1f)
                 )
 
-                // 🔖 북마크 버튼
+                // 🔖 북마크 버튼 (뱃지 기능 추가됨)
                 IconButton(onClick = {
                     // 버튼 누르면 폴더 목록 가져오고 다이얼로그 띄우기
                     viewModel.fetchBookmarkFolders()
                     showBookmarkDialog = true
                 }) {
-                    Icon(
-                        imageVector = Icons.Default.Bookmark,
-                        contentDescription = "북마크 저장",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                    // 아이콘과 뱃지를 겹치기 위해 Box 사용
+                    Box(contentAlignment = Alignment.TopEnd) {
+
+                        // 1. 메인 아이콘
+                        Icon(
+                            // 저장된 게 있으면 채워진 아이콘, 없으면 테두리만 (또는 그냥 Bookmark)
+                            imageVector = Icons.Default.Bookmark,
+                            contentDescription = "북마크 저장",
+                            // 저장되었으면 금색, 아니면 회색
+                            tint = if (savedCount > 0) Color(0xFFFFD700) else Color.Gray,
+                            modifier = Modifier.size(32.dp)
+                        )
+
+                        // 2. 숫자 뱃지 (저장된 곳이 1곳 이상일 때만 표시)
+                        if (savedCount > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .offset(x = 4.dp, y = (-4).dp) // 아이콘보다 살짝 밖으로 빼기
+                                    .size(18.dp) // 뱃지 크기
+                                    .background(Color.Red, CircleShape) // 빨간 배경
+                                    .border(1.dp, Color.White, CircleShape), // 흰색 테두리
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = savedCount.toString(),
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
