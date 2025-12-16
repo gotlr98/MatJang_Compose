@@ -166,6 +166,7 @@ class MainMapViewModel(
         }
     }
 
+
     // -----------------------------------------------------------
     // 🗺️ 지도 검색 및 선택 관련
     // -----------------------------------------------------------
@@ -232,6 +233,43 @@ class MainMapViewModel(
                 val apiService = retrofit.create(KakaoLocalService::class.java)
 
                 MainMapViewModel(apiService)
+            }
+        }
+    }
+
+    // MainMapViewModel.kt 내부
+
+// MainMapViewModel.kt 내부 (addMatjipToFolder 함수 근처에 추가)
+
+    fun removeMatjipFromFolder(folder: BookmarkFolder, matjip: Matjip) {
+        viewModelScope.launch {
+            try {
+                // 1. Supabase DB에서 삭제 요청
+                // 주의: 'supabase'는 ViewModel 내에서 사용 중인 SupabaseClient 변수명입니다.
+                // (기존 코드에서 addMatjipToFolder 할 때 썼던 변수명과 똑같이 맞춰주세요)
+                db.from("folder_matjips").delete {
+                    filter {
+                        eq("folder_id", folder.id)
+                        eq("matjip_id", matjip.id)
+                    }
+                }
+
+                // 2. 성공 시, 화면(State) 즉시 업데이트 (새로고침 없이 UI 반영)
+                // 현재 해당 폴더의 맛집 리스트 가져오기
+                val currentList = _folderMatjips.value[folder.id] ?: emptyList()
+
+                // 삭제된 맛집을 리스트에서 제외
+                val updatedList = currentList.filter { it.id != matjip.id }
+
+                // 변경된 리스트를 StateFlow에 반영 (Map을 새로 만들어야 Compose가 인식함)
+                _folderMatjips.value = _folderMatjips.value.toMutableMap().apply {
+                    put(folder.id, updatedList)
+                }
+
+                android.util.Log.d("MainMapViewModel", "북마크 삭제 완료: ${folder.name}")
+
+            } catch (e: Exception) {
+                android.util.Log.e("MainMapViewModel", "북마크 삭제 에러: ${e.message}")
             }
         }
     }

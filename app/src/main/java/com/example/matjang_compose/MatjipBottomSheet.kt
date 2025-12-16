@@ -12,6 +12,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,15 +31,14 @@ import com.example.matjang_compose.MainMapViewModel
 @Composable
 fun MatjipBottomSheet(
     matjip: Matjip,
-    savedCount: Int, // 저장된 폴더 개수 (MainMapView에서 전달받음)
+    savedCount: Int, // 저장된 폴더 개수
     onDismiss: () -> Unit,
-    viewModel: MainMapViewModel = viewModel(factory = MainMapViewModel.Factory), // ViewModel 주입
-    onBookmarkClick: () -> Unit // (필요 시 사용, 현재는 내부에서 처리 중)
+    viewModel: MainMapViewModel = viewModel(factory = MainMapViewModel.Factory),
+    onBookmarkClick: () -> Unit = {} // 기본값 처리
 ) {
     // 다이얼로그 표시 상태 관리
     var showBookmarkDialog by remember { mutableStateOf(false) }
 
-    // 바텀 시트 UI
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -47,13 +48,12 @@ fun MatjipBottomSheet(
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
 
-            // [상단] 타이틀 + 북마크 아이콘 Row
+            // [상단] 타이틀 + 북마크 아이콘
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 맛집 이름
                 Text(
                     text = matjip.place_name,
                     style = MaterialTheme.typography.headlineSmall,
@@ -61,33 +61,26 @@ fun MatjipBottomSheet(
                     modifier = Modifier.weight(1f)
                 )
 
-                // 🔖 북마크 버튼 (뱃지 기능 추가됨)
+                // 🔖 북마크 버튼
                 IconButton(onClick = {
-                    // 버튼 누르면 폴더 목록 가져오고 다이얼로그 띄우기
                     viewModel.fetchBookmarkFolders()
                     showBookmarkDialog = true
                 }) {
-                    // 아이콘과 뱃지를 겹치기 위해 Box 사용
                     Box(contentAlignment = Alignment.TopEnd) {
-
-                        // 1. 메인 아이콘
                         Icon(
-                            // 저장된 게 있으면 채워진 아이콘, 없으면 테두리만 (또는 그냥 Bookmark)
                             imageVector = Icons.Default.Bookmark,
-                            contentDescription = "북마크 저장",
-                            // 저장되었으면 금색, 아니면 회색
+                            contentDescription = "북마크 관리",
                             tint = if (savedCount > 0) Color(0xFFFFD700) else Color.Gray,
                             modifier = Modifier.size(32.dp)
                         )
 
-                        // 2. 숫자 뱃지 (저장된 곳이 1곳 이상일 때만 표시)
                         if (savedCount > 0) {
                             Box(
                                 modifier = Modifier
-                                    .offset(x = 4.dp, y = (-4).dp) // 아이콘보다 살짝 밖으로 빼기
-                                    .size(18.dp) // 뱃지 크기
-                                    .background(Color.Red, CircleShape) // 빨간 배경
-                                    .border(1.dp, Color.White, CircleShape), // 흰색 테두리
+                                    .offset(x = 4.dp, y = (-4).dp)
+                                    .size(18.dp)
+                                    .background(Color.Red, CircleShape)
+                                    .border(1.dp, Color.White, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -118,7 +111,7 @@ fun MatjipBottomSheet(
         }
     }
 
-    // 📌 북마크 다이얼로그 호출
+    // 📌 북마크 관리 다이얼로그
     if (showBookmarkDialog) {
         BookmarkDialog(
             matjip = matjip,
@@ -128,16 +121,16 @@ fun MatjipBottomSheet(
     }
 }
 
-// 📌 별도의 다이얼로그 Composable 함수
 @Composable
 fun BookmarkDialog(
     matjip: Matjip,
     viewModel: MainMapViewModel,
     onDismissRequest: () -> Unit
 ) {
+    // 🔥 [중요] 폴더 목록과 각 폴더에 담긴 맛집 리스트를 구독
     val folders by viewModel.bookmarkFolders.collectAsState()
+    val folderMatjips by viewModel.folderMatjips.collectAsState()
 
-    // "폴더 추가하기" 화면인지 여부
     var isCreatingFolder by remember { mutableStateOf(false) }
     var newFolderName by remember { mutableStateOf("") }
 
@@ -153,16 +146,29 @@ fun BookmarkDialog(
                 modifier = Modifier.padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = if (isCreatingFolder) "새 리스트 만들기" else "리스트에 저장",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
+                // 상단 타이틀 영역
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = if (isCreatingFolder) "새 리스트 만들기" else "리스트에 저장",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                    // 닫기 버튼 (X)
+                    if (!isCreatingFolder) {
+                        IconButton(
+                            onClick = onDismissRequest,
+                            modifier = Modifier.align(Alignment.CenterEnd)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "닫기")
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 if (isCreatingFolder) {
-                    // 1️⃣ 새 폴더 생성 모드
+                    // 1️⃣ 새 폴더 생성 화면
                     OutlinedTextField(
                         value = newFolderName,
                         onValueChange = { newFolderName = it },
@@ -180,7 +186,7 @@ fun BookmarkDialog(
                         Button(onClick = {
                             if (newFolderName.isNotBlank()) {
                                 viewModel.createBookmarkFolder(newFolderName)
-                                isCreatingFolder = false // 생성 후 목록으로 돌아가기
+                                isCreatingFolder = false
                                 newFolderName = ""
                             }
                         }) {
@@ -189,9 +195,8 @@ fun BookmarkDialog(
                     }
 
                 } else {
-                    // 2️⃣ 폴더 목록 보여주기 모드
+                    // 2️⃣ 폴더 선택 및 관리 화면
                     if (folders.isEmpty()) {
-                        // 목록이 없을 때
                         Text(
                             text = "아직 저장한 리스트가 없습니다.\n나만의 맛집 리스트를 만들어보세요!",
                             style = MaterialTheme.typography.bodyMedium,
@@ -199,26 +204,53 @@ fun BookmarkDialog(
                             modifier = Modifier.padding(vertical = 20.dp)
                         )
                     } else {
-                        // 목록이 있을 때: 리스트 출력
                         LazyColumn(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 300.dp) // 너무 길어지면 스크롤
+                                .heightIn(max = 300.dp)
                         ) {
                             items(folders) { folder ->
+                                // 현재 맛집이 이 폴더에 이미 저장되어 있는지 확인
+                                val isSaved = folderMatjips[folder.id]?.any { it.id == matjip.id } == true
+
                                 Button(
                                     onClick = {
-                                        // 해당 폴더에 맛집 저장
-                                        viewModel.addMatjipToFolder(folder, matjip)
-                                        onDismissRequest() // 다이얼로그 닫기
+                                        if (isSaved) {
+                                            // 이미 저장됨 -> 삭제 (ViewModel에 함수 구현 필요)
+                                            viewModel.removeMatjipFromFolder(folder, matjip)
+                                        } else {
+                                            // 저장 안 됨 -> 추가
+                                            viewModel.addMatjipToFolder(folder, matjip)
+                                        }
+                                        // 💡 편의성을 위해 클릭 후 다이얼로그를 닫지 않고 유지합니다.
                                     },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 4.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF0F0F0), contentColor = Color.Black),
-                                    shape = RoundedCornerShape(8.dp)
+                                    // 저장된 상태면 색상을 진하게(Primary), 아니면 연하게(Gray)
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isSaved) MaterialTheme.colorScheme.primaryContainer else Color(0xFFF0F0F0),
+                                        contentColor = if (isSaved) MaterialTheme.colorScheme.onPrimaryContainer else Color.Black
+                                    ),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
-                                    Text(text = folder.name, modifier = Modifier.padding(8.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(text = folder.name)
+
+                                        // 저장 여부에 따른 아이콘 표시
+                                        if (isSaved) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "저장됨",
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -226,7 +258,6 @@ fun BookmarkDialog(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // (+) 버튼 (리스트 추가)
                     IconButton(
                         onClick = { isCreatingFolder = true },
                         modifier = Modifier
