@@ -30,7 +30,7 @@ class MainMapViewModel(
     private val _matjips = MutableStateFlow<List<Matjip>>(emptyList())
     val matjips: StateFlow<List<Matjip>> = _matjips.asStateFlow()
 
-    // 현재 선택된 맛집 (바텀 시트 표시용) - 중복된 _selectedPlace 제거함
+    // 현재 선택된 맛집 (바텀 시트 표시용)
     private val _selectedMatjip = MutableStateFlow<Matjip?>(null)
     val selectedMatjip: StateFlow<Matjip?> = _selectedMatjip.asStateFlow()
 
@@ -67,7 +67,6 @@ class MainMapViewModel(
     fun fetchUserProfile() {
         UserApiClient.instance.me { user, error ->
             if (user != null) {
-                // UserModel 매핑 오류 수정 완료
                 _userProfile.value = UserModel(
                     id = user.id,
                     nickname = user.kakaoAccount?.profile?.nickname ?: "이름 없음",
@@ -160,7 +159,48 @@ class MainMapViewModel(
                     .set(matjip)
                     .addOnSuccessListener {
                         Log.d("Firestore", "${folder.name}에 ${matjip.place_name} 저장 완료")
-                        // 필요 시 여기서 스낵바 이벤트 발생
+
+                        // ✨ [UI 즉시 반영 로직 추가] 저장 후 다시 fetch하지 않고 로컬 상태 업데이트
+                        val currentMap = _folderMatjips.value.toMutableMap()
+                        val currentList = currentMap[folder.id]?.toMutableList() ?: mutableListOf()
+                        // 중복 방지 후 추가
+                        if (currentList.none { it.id == matjip.id }) {
+                            currentList.add(matjip)
+                            currentMap[folder.id] = currentList
+                            _folderMatjips.value = currentMap
+                        }
+                    }
+            }
+        }
+    }
+
+    // 🔥 [수정됨] 맛집을 특정 폴더에서 삭제 (Firebase 버전)
+    fun removeMatjipFromFolder(folder: BookmarkFolder, matjip: Matjip) {
+        UserApiClient.instance.me { user, error ->
+            if (user != null) {
+                val userId = user.id.toString()
+
+                // Firestore 경로: users -> userId -> bookmark_folders -> folderId -> places -> matjipId
+                db.collection("users").document(userId)
+                    .collection("bookmark_folders").document(folder.id)
+                    .collection("places").document(matjip.id)
+                    .delete()
+                    .addOnSuccessListener {
+                        Log.d("Firestore", "북마크 삭제 완료: ${folder.name}")
+
+                        // 화면(State) 즉시 업데이트 (새로고침 없이 UI 반영)
+                        val currentMap = _folderMatjips.value.toMutableMap()
+                        val currentList = currentMap[folder.id] ?: emptyList()
+
+                        // 삭제된 맛집을 리스트에서 제외
+                        val updatedList = currentList.filter { it.id != matjip.id }
+
+                        // 변경된 리스트를 Map에 반영
+                        currentMap[folder.id] = updatedList
+                        _folderMatjips.value = currentMap
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("Firestore", "북마크 삭제 실패: ${e.message}")
                     }
             }
         }
@@ -233,43 +273,6 @@ class MainMapViewModel(
                 val apiService = retrofit.create(KakaoLocalService::class.java)
 
                 MainMapViewModel(apiService)
-            }
-        }
-    }
-
-    // MainMapViewModel.kt 내부
-
-// MainMapViewModel.kt 내부 (addMatjipToFolder 함수 근처에 추가)
-
-    fun removeMatjipFromFolder(folder: BookmarkFolder, matjip: Matjip) {
-        viewModelScope.launch {
-            try {
-                // 1. Supabase DB에서 삭제 요청
-                // 주의: 'supabase'는 ViewModel 내에서 사용 중인 SupabaseClient 변수명입니다.
-                // (기존 코드에서 addMatjipToFolder 할 때 썼던 변수명과 똑같이 맞춰주세요)
-                db.from("folder_matjips").delete {
-                    filter {
-                        eq("folder_id", folder.id)
-                        eq("matjip_id", matjip.id)
-                    }
-                }
-
-                // 2. 성공 시, 화면(State) 즉시 업데이트 (새로고침 없이 UI 반영)
-                // 현재 해당 폴더의 맛집 리스트 가져오기
-                val currentList = _folderMatjips.value[folder.id] ?: emptyList()
-
-                // 삭제된 맛집을 리스트에서 제외
-                val updatedList = currentList.filter { it.id != matjip.id }
-
-                // 변경된 리스트를 StateFlow에 반영 (Map을 새로 만들어야 Compose가 인식함)
-                _folderMatjips.value = _folderMatjips.value.toMutableMap().apply {
-                    put(folder.id, updatedList)
-                }
-
-                android.util.Log.d("MainMapViewModel", "북마크 삭제 완료: ${folder.name}")
-
-            } catch (e: Exception) {
-                android.util.Log.e("MainMapViewModel", "북마크 삭제 에러: ${e.message}")
             }
         }
     }
