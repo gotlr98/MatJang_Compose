@@ -28,6 +28,9 @@ import com.example.matjang_compose.Matjip
 import com.example.matjang_compose.BookmarkFolder
 import com.example.matjang_compose.MainMapViewModel
 
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+
 @Composable
 fun MatjipBottomSheet(
     matjip: Matjip,
@@ -38,6 +41,7 @@ fun MatjipBottomSheet(
 ) {
     // 다이얼로그 표시 상태 관리
     var showBookmarkDialog by remember { mutableStateOf(false) }
+
 
     Surface(
         modifier = Modifier
@@ -134,6 +138,8 @@ fun BookmarkDialog(
     var isCreatingFolder by remember { mutableStateOf(false) }
     var newFolderName by remember { mutableStateOf("") }
 
+    val context = LocalContext.current
+
     Dialog(onDismissRequest = onDismissRequest) {
         Card(
             shape = RoundedCornerShape(16.dp),
@@ -218,9 +224,13 @@ fun BookmarkDialog(
                                         if (isSaved) {
                                             // 이미 저장됨 -> 삭제 (ViewModel에 함수 구현 필요)
                                             viewModel.removeMatjipFromFolder(folder, matjip)
+
+                                            Toast.makeText(context, "${folder.name}에서 삭제되었습니다.", Toast.LENGTH_SHORT).show()
                                         } else {
                                             // 저장 안 됨 -> 추가
                                             viewModel.addMatjipToFolder(folder, matjip)
+
+                                            Toast.makeText(context, "${folder.name}에 저장되었습니다.", Toast.LENGTH_SHORT).show()
                                         }
                                         // 💡 편의성을 위해 클릭 후 다이얼로그를 닫지 않고 유지합니다.
                                     },
