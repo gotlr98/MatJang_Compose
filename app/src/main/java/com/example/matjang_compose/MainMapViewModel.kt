@@ -53,6 +53,10 @@ class MainMapViewModel(
     private val REST_API_KEY = BuildConfig.KAKAO_REST_API_KEY
     private val db = Firebase.firestore
 
+    // 내가 쓴 리뷰의 ID (null이면 작성 안 함)
+    private val _myReviewId = MutableStateFlow<String?>(null)
+    val myReviewId: StateFlow<String?> = _myReviewId.asStateFlow()
+
     init {
         fetchUserProfile()
     }
@@ -174,7 +178,7 @@ class MainMapViewModel(
         }
     }
 
-    // 🔥 [수정됨] 맛집을 특정 폴더에서 삭제 (Firebase 버전)
+    // 맛집을 특정 폴더에서 삭제
     fun removeMatjipFromFolder(folder: BookmarkFolder, matjip: Matjip) {
         UserApiClient.instance.me { user, error ->
             if (user != null) {
@@ -261,7 +265,39 @@ class MainMapViewModel(
         _selectedMatjip.value = null
     }
 
-    // 🏭 ViewModel Factory
+    // 🔍 내가 이 맛집에 리뷰를 썼는지 확인하는 함수
+    fun checkMyReview(matjipId: String) {
+        _myReviewId.value = null // 초기화 (이전 상태 잔상 방지)
+
+        UserApiClient.instance.me { user, error ->
+            if (user != null) {
+                val userId = user.id.toString()
+
+                // Firestore에서 조건 검색: matjipId == 현재맛집 && userId == 나
+                db.collection("reviews")
+                    .whereEqualTo("matjipId", matjipId)
+                    .whereEqualTo("userId", userId)
+                    .limit(1) // 하나만 찾으면 됨
+                    .get()
+                    .addOnSuccessListener { documents ->
+                        if (!documents.isEmpty) {
+                            // 리뷰가 존재함 -> 리뷰 ID 저장
+                            _myReviewId.value = documents.documents[0].id
+                            Log.d("ReviewCheck", "내 리뷰 찾음: ${_myReviewId.value}")
+                        } else {
+                            // 리뷰 없음
+                            _myReviewId.value = null
+                            Log.d("ReviewCheck", "작성한 리뷰 없음")
+                        }
+                    }
+                    .addOnFailureListener {
+                        _myReviewId.value = null
+                    }
+            }
+        }
+    }
+
+    // ViewModel Factory
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {

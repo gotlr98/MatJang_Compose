@@ -1,5 +1,6 @@
 // MatjipBottomSheet.kt
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,42 +12,48 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit // 아이콘 추가
+import androidx.compose.material.icons.filled.ArrowForward // 아이콘 추가
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.matjang_compose.Matjip
-import com.example.matjang_compose.BookmarkFolder
 import com.example.matjang_compose.MainMapViewModel
-
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun MatjipBottomSheet(
     matjip: Matjip,
-    savedCount: Int, // 저장된 폴더 개수
+    savedCount: Int,
     onDismiss: () -> Unit,
-    viewModel: MainMapViewModel = viewModel(factory = MainMapViewModel.Factory),
-    onBookmarkClick: () -> Unit = {} // 기본값 처리
+    onDetailClick: (String?) -> Unit, // 리뷰 ID는 ViewModel에서 확인하므로 여기선 일단 이동 신호만 줘도 됨
+    viewModel: MainMapViewModel = viewModel(factory = MainMapViewModel.Factory)
 ) {
-    // 다이얼로그 표시 상태 관리
     var showBookmarkDialog by remember { mutableStateOf(false) }
+    val myReviewId by viewModel.myReviewId.collectAsState()
 
+    // ⚡ 시트가 열릴 때 내 리뷰 확인
+    LaunchedEffect(matjip.id) {
+        viewModel.checkMyReview(matjip.id)
+    }
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .wrapContentHeight(),
+            .wrapContentHeight()
+            // ✨ [해결 2] 바텀시트 전체 클릭 시 상세화면 이동
+            .clickable {
+                onDetailClick(myReviewId)
+            },
         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
         color = Color.White
     ) {
@@ -65,7 +72,7 @@ fun MatjipBottomSheet(
                     modifier = Modifier.weight(1f)
                 )
 
-                // 🔖 북마크 버튼
+                // 🔖 북마크 버튼 (이 버튼은 상위 Surface의 클릭 이벤트를 막고 자신의 동작만 수행해야 함)
                 IconButton(onClick = {
                     viewModel.fetchBookmarkFolders()
                     showBookmarkDialog = true
@@ -77,7 +84,6 @@ fun MatjipBottomSheet(
                             tint = if (savedCount > 0) Color(0xFFFFD700) else Color.Gray,
                             modifier = Modifier.size(32.dp)
                         )
-
                         if (savedCount > 0) {
                             Box(
                                 modifier = Modifier
@@ -87,12 +93,7 @@ fun MatjipBottomSheet(
                                     .border(1.dp, Color.White, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = savedCount.toString(),
-                                    color = Color.White,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Text(savedCount.toString(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -104,18 +105,27 @@ fun MatjipBottomSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
             Text(text = "주소: ${matjip.address_name ?: "정보 없음"}", style = MaterialTheme.typography.bodyLarge)
-
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Text(text = "전화: ${matjip.phone ?: "정보 없음"}", style = MaterialTheme.typography.bodyLarge)
 
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                Text("닫기")
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ✨ 하단 안내 텍스트 (버튼 대신 텍스트로 유도)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "터치하여 상세정보 및 리뷰 쓰기 >",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
             }
         }
     }
 
-    // 📌 북마크 관리 다이얼로그
     if (showBookmarkDialog) {
         BookmarkDialog(
             matjip = matjip,

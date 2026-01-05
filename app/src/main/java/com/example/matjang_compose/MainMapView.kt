@@ -5,7 +5,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,13 +28,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController // 👈 네비게이션 사용을 위해 import 필요
 import com.kakao.vectormap.KakaoMap
 import com.kakao.vectormap.KakaoMapReadyCallback
 import com.kakao.vectormap.LatLng
@@ -52,6 +50,7 @@ import kotlinx.coroutines.launch
 fun MainMapView(
     latitude: Double,
     longitude: Double,
+    navController: NavController, // 👈 [수정] 네비게이션 컨트롤러 추가
     viewModel: MainMapViewModel = viewModel(factory = MainMapViewModel.Factory)
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -70,6 +69,7 @@ fun MainMapView(
     val bookmarkFolders by viewModel.bookmarkFolders.collectAsState()
     val folderMatjips by viewModel.folderMatjips.collectAsState()
 
+    // 저장된 개수 계산 로직 (정상)
     val savedCount = remember(selectedMatjip, folderMatjips) {
         if (selectedMatjip == null) 0
         else {
@@ -104,8 +104,7 @@ fun MainMapView(
         }
     }
 
-    // Drawer가 열려있을 때만 제스처를 활성화
-
+    // Drawer 구성
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -135,7 +134,6 @@ fun MainMapView(
                                     kakaoMapController = map
                                     map.moveCamera(CameraUpdateFactory.newCenterPosition(LatLng.from(latitude, longitude)))
 
-                                    // 리스너에서 viewModel의 최신 값을 직접 확인
                                     map.setOnCameraMoveEndListener { _, cameraPosition, _ ->
                                         if (viewModel.mapMode.value == MapMode.SEARCH) {
                                             viewModel.searchPlaces(cameraPosition.position.latitude, cameraPosition.position.longitude)
@@ -270,23 +268,17 @@ fun MainMapView(
             val context = androidx.compose.ui.platform.LocalContext.current
 
             LaunchedEffect(kakaoMapController, matjipPlaces) {
-                // 1. 맵 컨트롤러가 준비되지 않았거나, 데이터가 없으면 실행하지 않음
                 val map = kakaoMapController ?: return@LaunchedEffect
                 val labelManager = map.labelManager ?: return@LaunchedEffect
-
-                // 데이터가 비어있어도 기존 핀을 지우기 위해 진행은 하되, 로그 확인용
-                android.util.Log.d("MatjipMap", "핀 그리기 시도: 데이터 개수 = ${matjipPlaces.size}")
 
                 val layerId = "MatjipPinsLayer"
                 val layer = labelManager.getLayer(layerId)
                     ?: labelManager.addLayer(LabelLayerOptions.from(layerId).setZOrder(10000))
 
-                // 기존 핀 제거 (중복 방지)
                 layer?.removeAll()
 
                 if (matjipPlaces.isEmpty()) return@LaunchedEffect
 
-                // 벡터(XML) 이미지를 비트맵으로 변환
                 val bitmap = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_pin_marker)?.let { drawable ->
                     val canvasBitmap = android.graphics.Bitmap.createBitmap(
                         drawable.intrinsicWidth,
@@ -299,18 +291,13 @@ fun MainMapView(
                     canvasBitmap
                 }
 
-                if (bitmap == null) {
-                    android.util.Log.e("MatjipMap", "이미지 변환 실패: ic_pin_marker를 찾을 수 없거나 변환 불가")
-                    return@LaunchedEffect
-                }
+                if (bitmap == null) return@LaunchedEffect
 
-                // 2. 스타일 생성 (변환된 비트맵 사용)
                 val pinStyle = LabelStyle.from(bitmap)
-                    .setAnchorPoint(0.5f, 1.0f) // 하단 중앙을 좌표에 맞춤
+                    .setAnchorPoint(0.5f, 1.0f)
 
                 val styles = LabelStyles.from(pinStyle)
 
-                // 3. LabelOptions 리스트 생성 (배치 처리)
                 val labelOptionsList = matjipPlaces.map { matjip ->
                     LabelOptions.from(LatLng.from(matjip.y, matjip.x))
                         .setStyles(styles)
@@ -318,26 +305,31 @@ fun MainMapView(
                         .setTag(matjip)
                 }
 
-                // 4. 한 번에 추가 (SDK 권장 방식)
                 try {
                     layer?.addLabels(labelOptionsList)
-                    android.util.Log.d("MatjipMap", "핀 ${labelOptionsList.size}개 추가 완료")
                 } catch (e: Exception) {
-                    android.util.Log.e("MatjipMap", "핀 추가 중 오류 발생: ${e.message}")
+                    android.util.Log.e("MatjipMap", "핀 에러: ${e.message}")
                 }
             }
 
             // (5) 바텀 시트
             selectedMatjip?.let { matjip ->
                 Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+                    // 🚩 [수정완료] 오류 부분 해결
                     MatjipBottomSheet(
-                        matjip = matjip,
-                        savedCount = savedCount, // 👈 [추가] 계산된 카운트 전달
+                        matjip = matjip, // selectedMatjip은 null이 아님이 보장됨 (let 안)
+                        savedCount = savedCount, // 위에서 계산한 변수 전달
+                        viewModel = viewModel, // ViewModel 전달
                         onDismiss = { viewModel.dismissBottomSheet() },
-                        // 북마크 클릭 시 동작 (기존에 구현하신 로직 연결)
-                        onBookmarkClick = {
-                            // 여기에 폴더 선택 다이얼로그 띄우는 로직 등
-                            // viewModel.showBookmarkDialog(matjip)
+                        onDetailClick = { reviewId ->
+                            if (reviewId != null) {
+                                // 내 리뷰가 있음 -> 리뷰 수정 화면으로 (id 전달)
+                                // "review_edit_screen"은 NavHost에 정의된 이름이어야 함
+                                navController.navigate("review_edit_screen/$reviewId")
+                            } else {
+                                // 내 리뷰 없음 -> 맛집 상세(리뷰 작성) 화면으로
+                                navController.navigate("matjip_detail_screen/${matjip.id}")
+                            }
                         }
                     )
                 }
@@ -346,8 +338,8 @@ fun MainMapView(
     }
 }
 
-// 👇 사이드 메뉴 관련 컴포저블 함수들 (유지)
-
+// ... (SideMenuContent 등 아래 부분은 동일) ...
+// 사이드 메뉴 관련 코드는 그대로 두시면 됩니다.
 @Composable
 fun SideMenuContent(
     viewModel: MainMapViewModel,
@@ -358,7 +350,6 @@ fun SideMenuContent(
     val folderMatjips by viewModel.folderMatjips.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // 🧑‍💻 프로필 영역
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -386,7 +377,6 @@ fun SideMenuContent(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // 📚 폴더 리스트
         Text(
             "나의 북마크 폴더",
             style = MaterialTheme.typography.titleMedium,
@@ -408,7 +398,6 @@ fun SideMenuContent(
     }
 }
 
-// 📂 폴더 아이템 컴포넌트
 @Composable
 fun FolderItem(
     folder: BookmarkFolder,
@@ -443,7 +432,6 @@ fun FolderItem(
             )
         }
 
-        // 📌 폴더 내용 (맛집 리스트)
         AnimatedVisibility(visible = expanded) {
             Column(modifier = Modifier.padding(start = 24.dp)) {
                 if (savedMatjips.isEmpty()) {
@@ -464,7 +452,6 @@ fun FolderItem(
     }
 }
 
-// 🍽️ 맛집 아이템 컴포넌트
 @Composable
 fun MatjipItem(matjip: Matjip, onMatjipClick: (Matjip) -> Unit) {
     Row(

@@ -14,10 +14,10 @@ import androidx.navigation.navArgument
 fun AppNavGraph(navController: NavHostController) {
     NavHost(
         navController = navController,
-        startDestination = NavRoutes.Splash.route // .name 대신 .route 권장
+        startDestination = NavRoutes.Splash.route
     ) {
 
-        // 스플래시 화면 (자동로그인 체크)
+        // 스플래시 화면
         composable(NavRoutes.Splash.route) {
             SplashView(navController = navController)
         }
@@ -29,18 +29,40 @@ fun AppNavGraph(navController: NavHostController) {
 
         // 메인 지도 화면
         composable(
-            route = NavRoutes.MainMap.route, // "main_map/{lat}/{lng}"
+            route = NavRoutes.MainMap.route,
             arguments = listOf(
                 navArgument("lat") { type = NavType.FloatType },
                 navArgument("lng") { type = NavType.FloatType }
             )
         ) { backStackEntry ->
-            // 인자 받기 (Float로 받아서 Double로 변환)
             val lat = backStackEntry.arguments?.getFloat("lat")?.toDouble() ?: 37.5665
             val lng = backStackEntry.arguments?.getFloat("lng")?.toDouble() ?: 126.9780
 
-            MainMapView(latitude = lat, longitude = lng)
+            // ✅ [수정] navController 인자를 추가로 넘겨줍니다.
+            MainMapView(
+                latitude = lat,
+                longitude = lng,
+                navController = navController
+            )
         }
+
+        composable("matjip_detail_screen/{matjipId}") { backStackEntry ->
+            val matjipId = backStackEntry.arguments?.getString("matjipId") ?: ""
+
+            // 기존 맵 뷰모델 (공유된 인스턴스 혹은 새 인스턴스)
+            val mapViewModel: MainMapViewModel = viewModel(factory = MainMapViewModel.Factory)
+
+            // ✨ 새로운 리뷰 뷰모델
+            val reviewViewModel: ReviewViewModel = viewModel(factory = ReviewViewModel.Factory())
+
+            MatjipDetailView(
+                navController = navController,
+                matjipId = matjipId,
+                mapViewModel = mapViewModel,       // 읽기용
+                reviewViewModel = reviewViewModel  // 쓰기용
+            )
+        }
+
     }
 }
 
