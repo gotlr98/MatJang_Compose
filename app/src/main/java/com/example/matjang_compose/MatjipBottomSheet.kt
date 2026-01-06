@@ -1,5 +1,3 @@
-// MatjipBottomSheet.kt
-
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -14,8 +12,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit // 아이콘 추가
-import androidx.compose.material.icons.filled.ArrowForward // 아이콘 추가
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,24 +31,36 @@ import com.example.matjang_compose.MainMapViewModel
 @Composable
 fun MatjipBottomSheet(
     matjip: Matjip,
-    savedCount: Int,
+    savedCount: Int, // 👈 (참고) 이제 이 값 대신 내부 계산값을 사용합니다.
     onDismiss: () -> Unit,
-    onDetailClick: (String?) -> Unit, // 리뷰 ID는 ViewModel에서 확인하므로 여기선 일단 이동 신호만 줘도 됨
+    onDetailClick: (String?) -> Unit,
     viewModel: MainMapViewModel = viewModel(factory = MainMapViewModel.Factory)
 ) {
     var showBookmarkDialog by remember { mutableStateOf(false) }
     val myReviewId by viewModel.myReviewId.collectAsState()
 
-    // ⚡ 시트가 열릴 때 내 리뷰 확인
+    // ⚡ [추가 1] ViewModel의 폴더 데이터를 여기서도 직접 구독합니다.
+    val bookmarkFolders by viewModel.bookmarkFolders.collectAsState()
+    val folderMatjips by viewModel.folderMatjips.collectAsState()
+
+    // ⚡ [추가 2] 실시간으로 저장된 개수를 계산합니다.
+    // (Dialog에서 추가/삭제하면 folderMatjips가 변하고, 이 값도 즉시 바뀝니다)
+    val realTimeSavedCount = remember(bookmarkFolders, folderMatjips, matjip) {
+        bookmarkFolders.count { folder ->
+            folderMatjips[folder.id]?.any { it.id == matjip.id } == true
+        }
+    }
+
+    // ⚡ 시트가 열릴 때 내 리뷰 확인 + [추가] 폴더 정보 최신화
     LaunchedEffect(matjip.id) {
         viewModel.checkMyReview(matjip.id)
+        viewModel.fetchBookmarkFolders() // 폴더 목록 불러오기
     }
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .wrapContentHeight()
-            // ✨ [해결 2] 바텀시트 전체 클릭 시 상세화면 이동
             .clickable {
                 onDetailClick(myReviewId)
             },
@@ -72,19 +82,21 @@ fun MatjipBottomSheet(
                     modifier = Modifier.weight(1f)
                 )
 
-                // 🔖 북마크 버튼 (이 버튼은 상위 Surface의 클릭 이벤트를 막고 자신의 동작만 수행해야 함)
+                // 🔖 북마크 버튼
                 IconButton(onClick = {
+                    // 클릭 시에도 확실하게 데이터 갱신 요청
                     viewModel.fetchBookmarkFolders()
                     showBookmarkDialog = true
                 }) {
                     Box(contentAlignment = Alignment.TopEnd) {
+                        // ⚡ [수정] savedCount 대신 realTimeSavedCount 사용
                         Icon(
                             imageVector = Icons.Default.Bookmark,
                             contentDescription = "북마크 관리",
-                            tint = if (savedCount > 0) Color(0xFFFFD700) else Color.Gray,
+                            tint = if (realTimeSavedCount > 0) Color(0xFFFFD700) else Color.Gray,
                             modifier = Modifier.size(32.dp)
                         )
-                        if (savedCount > 0) {
+                        if (realTimeSavedCount > 0) {
                             Box(
                                 modifier = Modifier
                                     .offset(x = 4.dp, y = (-4).dp)
@@ -93,7 +105,13 @@ fun MatjipBottomSheet(
                                     .border(1.dp, Color.White, CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(savedCount.toString(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                // ⚡ [수정] 텍스트도 realTimeSavedCount 사용
+                                Text(
+                                    realTimeSavedCount.toString(),
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
@@ -110,7 +128,7 @@ fun MatjipBottomSheet(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // ✨ 하단 안내 텍스트 (버튼 대신 텍스트로 유도)
+            // 하단 안내 텍스트
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
@@ -141,7 +159,6 @@ fun BookmarkDialog(
     viewModel: MainMapViewModel,
     onDismissRequest: () -> Unit
 ) {
-    // 🔥 [중요] 폴더 목록과 각 폴더에 담긴 맛집 리스트를 구독
     val folders by viewModel.bookmarkFolders.collectAsState()
     val folderMatjips by viewModel.folderMatjips.collectAsState()
 
@@ -162,7 +179,7 @@ fun BookmarkDialog(
                 modifier = Modifier.padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 상단 타이틀 영역
+                // 상단 타이틀
                 Box(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = if (isCreatingFolder) "새 리스트 만들기" else "리스트에 저장",
@@ -170,7 +187,6 @@ fun BookmarkDialog(
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.align(Alignment.Center)
                     )
-                    // 닫기 버튼 (X)
                     if (!isCreatingFolder) {
                         IconButton(
                             onClick = onDismissRequest,
@@ -184,7 +200,7 @@ fun BookmarkDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 if (isCreatingFolder) {
-                    // 1️⃣ 새 폴더 생성 화면
+                    // 새 폴더 생성 화면
                     OutlinedTextField(
                         value = newFolderName,
                         onValueChange = { newFolderName = it },
@@ -211,7 +227,7 @@ fun BookmarkDialog(
                     }
 
                 } else {
-                    // 2️⃣ 폴더 선택 및 관리 화면
+                    // 폴더 리스트
                     if (folders.isEmpty()) {
                         Text(
                             text = "아직 저장한 리스트가 없습니다.\n나만의 맛집 리스트를 만들어보세요!",
@@ -226,28 +242,23 @@ fun BookmarkDialog(
                                 .heightIn(max = 300.dp)
                         ) {
                             items(folders) { folder ->
-                                // 현재 맛집이 이 폴더에 이미 저장되어 있는지 확인
                                 val isSaved = folderMatjips[folder.id]?.any { it.id == matjip.id } == true
 
                                 Button(
                                     onClick = {
                                         if (isSaved) {
-                                            // 이미 저장됨 -> 삭제 (ViewModel에 함수 구현 필요)
                                             viewModel.removeMatjipFromFolder(folder, matjip)
-
                                             Toast.makeText(context, "${folder.name}에서 삭제되었습니다.", Toast.LENGTH_SHORT).show()
                                         } else {
-                                            // 저장 안 됨 -> 추가
                                             viewModel.addMatjipToFolder(folder, matjip)
-
                                             Toast.makeText(context, "${folder.name}에 저장되었습니다.", Toast.LENGTH_SHORT).show()
                                         }
-                                        // 💡 편의성을 위해 클릭 후 다이얼로그를 닫지 않고 유지합니다.
+                                        // 클릭 시 ViewModel이 업데이트되면 folderMatjips가 변하고 ->
+                                        // MatjipBottomSheet의 realTimeSavedCount도 자동으로 변합니다.
                                     },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 4.dp),
-                                    // 저장된 상태면 색상을 진하게(Primary), 아니면 연하게(Gray)
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (isSaved) MaterialTheme.colorScheme.primaryContainer else Color(0xFFF0F0F0),
                                         contentColor = if (isSaved) MaterialTheme.colorScheme.onPrimaryContainer else Color.Black
@@ -261,8 +272,6 @@ fun BookmarkDialog(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text(text = folder.name)
-
-                                        // 저장 여부에 따른 아이콘 표시
                                         if (isSaved) {
                                             Icon(
                                                 imageVector = Icons.Default.Check,
