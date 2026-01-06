@@ -1,13 +1,8 @@
 package com.example.matjang_compose
 
 import MatjipBottomSheet
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -15,17 +10,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
@@ -33,7 +24,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController // 👈 네비게이션 사용을 위해 import 필요
+import androidx.navigation.NavController
 import com.kakao.vectormap.KakaoMap
 import com.kakao.vectormap.KakaoMapReadyCallback
 import com.kakao.vectormap.LatLng
@@ -50,7 +41,7 @@ import kotlinx.coroutines.launch
 fun MainMapView(
     latitude: Double,
     longitude: Double,
-    navController: NavController, // 👈 [수정] 네비게이션 컨트롤러 추가
+    navController: NavController,
     viewModel: MainMapViewModel = viewModel(factory = MainMapViewModel.Factory)
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -69,11 +60,10 @@ fun MainMapView(
     val bookmarkFolders by viewModel.bookmarkFolders.collectAsState()
     val folderMatjips by viewModel.folderMatjips.collectAsState()
 
-    // 저장된 개수 계산 로직 (정상)
+    // 저장된 개수 계산 로직
     val savedCount = remember(selectedMatjip, folderMatjips) {
         if (selectedMatjip == null) 0
         else {
-            // 전체 폴더 맵(folderMatjips)을 순회하며 내 맛집 ID가 포함된 폴더 수 카운트
             bookmarkFolders.count { folder ->
                 folderMatjips[folder.id]?.any { it.id == selectedMatjip?.id } == true
             }
@@ -112,6 +102,7 @@ fun MainMapView(
                 modifier = Modifier.fillMaxWidth(0.7f).fillMaxHeight(),
                 drawerContainerColor = Color.White
             ) {
+                // ✨ 여기서 SideMenuView.kt에 정의된 함수를 호출합니다.
                 SideMenuContent(viewModel = viewModel, onMatjipClick = onSideMenuMatjipClick)
             }
         },
@@ -315,157 +306,21 @@ fun MainMapView(
             // (5) 바텀 시트
             selectedMatjip?.let { matjip ->
                 Box(modifier = Modifier.align(Alignment.BottomCenter)) {
-                    // 🚩 [수정완료] 오류 부분 해결
                     MatjipBottomSheet(
-                        matjip = matjip, // selectedMatjip은 null이 아님이 보장됨 (let 안)
-                        savedCount = savedCount, // 위에서 계산한 변수 전달
-                        viewModel = viewModel, // ViewModel 전달
+                        matjip = matjip,
+                        savedCount = savedCount,
+                        viewModel = viewModel,
                         onDismiss = { viewModel.dismissBottomSheet() },
                         onDetailClick = { reviewId ->
                             if (reviewId != null) {
-                                // 내 리뷰가 있음 -> 리뷰 수정 화면으로 (id 전달)
-                                // "review_edit_screen"은 NavHost에 정의된 이름이어야 함
                                 navController.navigate("review_edit_screen/$reviewId")
                             } else {
-                                // 내 리뷰 없음 -> 맛집 상세(리뷰 작성) 화면으로
                                 navController.navigate("matjip_detail_screen/${matjip.id}")
                             }
                         }
                     )
                 }
             }
-        }
-    }
-}
-
-// ... (SideMenuContent 등 아래 부분은 동일) ...
-// 사이드 메뉴 관련 코드는 그대로 두시면 됩니다.
-@Composable
-fun SideMenuContent(
-    viewModel: MainMapViewModel,
-    onMatjipClick: (Matjip) -> Unit
-) {
-    val userProfile by viewModel.userProfile.collectAsState()
-    val bookmarkFolders by viewModel.bookmarkFolders.collectAsState()
-    val folderMatjips by viewModel.folderMatjips.collectAsState()
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                Icons.Default.Person,
-                contentDescription = "프로필",
-                modifier = Modifier.size(40.dp)
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(
-                    text = userProfile?.nickname ?: "Guest",
-                    style = MaterialTheme.typography.titleLarge
-                )
-                Text(
-                    text = userProfile?.email ?: "로그인 정보 없음",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            "나의 북마크 폴더",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-
-        Divider()
-
-        LazyColumn {
-            items(bookmarkFolders) { folder ->
-                FolderItem(
-                    folder = folder,
-                    viewModel = viewModel,
-                    onMatjipClick = onMatjipClick,
-                    savedMatjips = folderMatjips[folder.id] ?: emptyList()
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun FolderItem(
-    folder: BookmarkFolder,
-    viewModel: MainMapViewModel,
-    onMatjipClick: (Matjip) -> Unit,
-    savedMatjips: List<Matjip>
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val rotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "rotation")
-
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
-                    expanded = !expanded
-                    if (expanded) {
-                        viewModel.fetchMatjipsInFolder(folder.id)
-                    }
-                }
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.Folder, contentDescription = "폴더", tint = MaterialTheme.colorScheme.secondary)
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(folder.name, modifier = Modifier.weight(1f))
-            Text("(${savedMatjips.size})", style = MaterialTheme.typography.bodySmall)
-            Icon(
-                Icons.Default.ArrowDropDown,
-                contentDescription = "확장",
-                modifier = Modifier.rotate(rotation)
-            )
-        }
-
-        AnimatedVisibility(visible = expanded) {
-            Column(modifier = Modifier.padding(start = 24.dp)) {
-                if (savedMatjips.isEmpty()) {
-                    Text(
-                        "저장된 맛집이 없습니다.",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)
-                    )
-                } else {
-                    savedMatjips.forEach { matjip ->
-                        MatjipItem(matjip = matjip, onMatjipClick = onMatjipClick)
-                        Divider(Modifier.padding(horizontal = 16.dp))
-                    }
-                }
-            }
-        }
-        Divider()
-    }
-}
-
-@Composable
-fun MatjipItem(matjip: Matjip, onMatjipClick: (Matjip) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onMatjipClick(matjip) }
-            .padding(vertical = 12.dp, horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(Icons.Default.Place, contentDescription = "장소", modifier = Modifier.size(20.dp))
-        Spacer(modifier = Modifier.width(8.dp))
-        Column {
-            Text(matjip.place_name, style = MaterialTheme.typography.bodyMedium)
-            Text(matjip.category_name.split(" > ").last(), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
         }
     }
 }
